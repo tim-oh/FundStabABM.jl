@@ -1,11 +1,9 @@
 using Test, Random, LinearAlgebra
 
 include("../src/types.jl")
-include("../src/params.jl")
-
 using .Types
 
-#
+# Small parameter values for testing, like those in /src/params.jl
 const big_m = 10 # Number of stocks
 const big_n = 10 # Number of investors
 const big_t = 20 # Number of time periods
