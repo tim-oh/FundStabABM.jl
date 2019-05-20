@@ -30,10 +30,17 @@ function betainit(bigm=Params.bigm, betastd=Params.betastd, betamean=Params.beta
     return betas
 end
 
-function stockvolinit(bigm=Params.bigm, volrange=Params.stockvolrange)
-    stockvol = volrange[1] .+ rand(bigm) .* (volrange[2] - volrange[1])
+# Function for a discrete volatility range
+function stockvolinit(volrange=Params.stockvolrange, bigm=Params.bigm)
+    stockvol = rand(volrange, bigm)
     return stockvol
 end
+
+# Function for a continuous volatility range
+#function stockvolinit(bigm=Params.bigm, volrange=Params.stockvolrange)
+#    stockvol = volrange[1] .+ rand(bigm) .* (volrange[end] - volrange[1])
+#    return stockvol
+#end
 
 function stockvalueinit!(
     stocks, stockstartval, horizon, marketval)
@@ -46,7 +53,7 @@ function stockvalueinit!(
 end
 
 function invhorizoninit!(emptyvals, hrange)
-    horizons = rand(hrange[1]:hrange[2], length(emptyvals))
+    horizons = rand(hrange, length(emptyvals))
     return horizons
 end
 

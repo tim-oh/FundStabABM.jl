@@ -11,13 +11,17 @@ const bigt = 6 # Number of time periods, 6
 const marketstartval = 100 # Market index starting value, 100
 const drift = 0.05 # Market index drift, 0.05
 const marketvol = 0.1 # Market volatility (std?), 0.1
-const perfwindow = (1, 3) # Performance window for investor (1,3)
+const perfwindow = 1:3 # Performance window for investor (1,3)
+# QUESTION: should this be a continuous range or is discrete okay?
 const betamean = 1 # Average stock beta, 1
 const betastd = 0.3 # Stock beta dispersion, 0.3
 const stockstartval = 100
-const stockvolrange = (0.1, 0.5) # Range of stock volatility (0.1, 0.5)
-const invcaprange = (10, 1000) # Investors' range of initial capital, (10, 1000)
-const horizonrange = (1,5)
+const stockvolrange = range(0.1, stop=0.5, step=0.1)
+# Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
+const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
+# TODO: turn into proper range, though requires major recalculation OR
+# different specs of the tests so that they're independent
+const horizonrange = 1:5
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
@@ -40,8 +44,11 @@ rng = MersenneTwister(1)
 
     # Generate stock volatilities
     Random.seed!(2)
-    @test Func.stockvolinit(bigm, stockvolrange) ==
-    0.1 .+ (0.5 - 0.1) .* rand(MersenneTwister(2), 5)
+    Func.stockvolinit(stockvolrange, bigm) == [0.2 0.2 0.2 0.3 0.5]
+
+#   Test for a continuous stock vol range
+#    @test Func.stockvolinit(bigm, stockvolrange) ==
+#    0.1 .+ (0.5 - 0.1) .* rand(MersenneTwister(2), 5)
 
     # Generate stocks' value history
     market.value[1] = 100
@@ -72,9 +79,9 @@ rng = MersenneTwister(1)
     zeros(bign),
     zeros(bign))
 
-    Random.seed!(5)
+    Random.seed!(29)
     @test Func.invhorizoninit!(investors.horizon, horizonrange) ==
-    [5, 2, 4, 4]
+    [3, 1, 3, 5]
 
     Random.seed!(6)
     @test Func.invthreshinit!(investors.threshold, thresholdmean,

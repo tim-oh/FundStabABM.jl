@@ -13,7 +13,7 @@ using Test, .Params
     @test Params.betamean > 0 # The average stock should correlate positively with the index
     @test Params.betastd >= 0
     @test 0 <= Params.stockvolrange[1] <= Params.stockvolrange[end]
-    @test 0 <=Params.invcaprange[1] <= Params.invcaprange[end]
+    @test 0 <=Params.invcaprange[1] <= Params.invcaprange[2]
     @test Params.stockstartval >= 0
     @test Params.horizonrange[1] <= Params.horizonrange[end] < Params.bigt
     @test -1 < Params.thresholdmean < 1
