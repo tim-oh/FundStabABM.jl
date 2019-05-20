@@ -8,7 +8,7 @@ const bigk = 3 # Number of funds, 3
 const bign = 4 # Number of investors, 4
 const bigm = 5 # Number of stocks, 5
 const bigt = 6 # Number of time periods, 6
-const marketstartval = 100 # Market index starting value, 100
+const mktstartval = 100 # Market index starting value, 100
 const drift = 0.05 # Market index drift, 0.05
 const marketvol = 0.1 # Market volatility (std?), 0.1
 const perfwindow = 1:3 # Performance window for investor (1,3)
@@ -17,7 +17,7 @@ const betamean = 1 # Average stock beta, 1
 const betastd = 0.3 # Stock beta dispersion, 0.3
 const stockstartval = 100 # Starting value of stocks
 # TODO: turn into range
-const stockvolrange = range(0.1, stop=0.5, step=0.1)
+const stockvolrange = range(0.01, stop=0.1, step=0.01)
 # Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
 const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
 # TODO: turn into proper range, though requires major recalculation OR
@@ -29,46 +29,54 @@ const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
 rng = MersenneTwister(1)
 
 
-
 @testset "Initialisation Functions" begin
 
     # Generate market value history
     market = Types.MarketIndex(
         zeros(bigt))
-    @test all(Func.marketinit!(market.value, marketstartval, perfwindow[2])
+
+    Random.seed!(0)
+    @test all(Func.marketinit!(market.value, mktstartval, perfwindow[end],
+    drift, marketvol)
     .>= 0)
+    # TODO: Replace inequality with specific values
+
+    stocks = Types.Equity(
+        zeros(bigm, bigt),
+        zeros(bigm),
+        zeros(bigm))
 
     # Generate stock betas
     Random.seed!(1)
-    @test Func.betainit(bigm, betastd, betamean) ==
+    @test Func.betainit!(stocks.beta, bigm, betastd, betamean) ==
     1 .+ 0.3 .* randn(MersenneTwister(1), 5)
 
     # Generate stock volatilities
     Random.seed!(2)
-    Func.stockvolinit(stockvolrange, bigm) == [0.2 0.2 0.2 0.3 0.5]
+    @test Func.stockvolinit!(stocks.vol, stockvolrange, bigm) ==
+    vec([0.02 0.1 0.07 0.02 0.05])
+
+    # QUESTION: should these be ! functions at all?
 
 #   Test for a continuous stock vol range
 #    @test Func.stockvolinit(bigm, stockvolrange) ==
 #    0.1 .+ (0.5 - 0.1) .* rand(MersenneTwister(2), 5)
 
-    # Generate stocks' value history
-    market.value[1] = 100
-    market.value[2] = 101
-    stocks = Types.Equity(
-        zeros(bigm, bigt),
-        zeros(bigm),
-        zeros(bigm))
-    stocks.beta .= [0, 1, 2, 3, 4]
-    stocks.vol .= [0.01, 0.01, 0.01, 0.01, 0.01]
-    Random.seed!(3)
-    @test Func.stockvalueinit!(stocks, stockstartval, perfwindow[2],
-    market.value)[:,1:2] ==
-    hcat(ones(5)*100,
-    [100, 101, 102, 103, 104] +
-    [1.1915557734285787, -2.5197330871745263, 2.0748097755419757,
-    -0.9732501200602984, -0.1016067940589428])
+    Random.seed!(2)
+    stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+    # QUESTION: why do I have to assign it explicitly here and not elsewhere?
 
-    #TODO: stocks integration tests
+    # Generate stocks' value history
+    Random.seed!(3)
+    @test Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
+    market.value)[:,1:2] ≈
+    hcat(ones(5,1) .* 100,
+    [105.51989943374585, 105.64929533253186, 104.15928328717519,
+    105.05203007235151, 103.79227677999667] +
+    [2.3831115468571573, -25.197330871745265, 14.523668428793831,
+    -1.946500240120597, -0.508033970294714])
+
+    # TODO: stocks integration tests
 
     # TODO: @test stockimpactinit
     # TODO: funds integration tests
@@ -88,8 +96,8 @@ rng = MersenneTwister(1)
     [-0.06570018342662688, 0.00665192247499981,
     0.06774218278688489, 0.002180862789142308]
 
-
-    # The first bigk investors put their money in that of the first bigk funds that matches their own index
+    # The first bigk investors put their money in that of the first bigk funds
+    # that matches their own index
     Random.seed!(7)
     @test LinearAlgebra.diag(Func.invassetinit!(investors.assets,
     invcaprange, bigk)[1:bigk, 1:bigk]) == [318, 111, 692]
@@ -103,14 +111,16 @@ rng = MersenneTwister(1)
 
     #TODO: investors integration tests
 
-    # QUESTION: how do you have separate tests for A) directly after initialisation, and B) following periods. I really want three kinds (pre-initialisation, post-initialisation, during the runs)
+    # QUESTION: how do you have separate tests for A) directly after
+    #initialisation, and B) following periods. I really want three kinds
+    #(pre-initialisation, post-initialisation, during the runs)
 
     funds = Types.EquityFund(
     zeros(bigk, bigm),
     zeros(bigk, bign),
     zeros(bigk, bigt))
 
-    @test Func.fundvalinit!(funds.value, investors.assets) ==
+    @test Func.fundcapitalinit!(funds.value, investors.assets) ==
     hcat([318.0, 1003.0, 692.0], zeros(3,5))
 
     @test Func.fundstakeinit!(funds.stakes, investors.assets) ==
@@ -125,9 +135,14 @@ rng = MersenneTwister(1)
     [0 0 0 318/100 0; 1003/500 0 3009/500 1003/500 0;
     692/200 0 0 692/200 0]
 
-    @test_broken funds.value[:,1] == sum(funds.holdings .* stocks.value[1], dims=2)
-    # TODO: work out how to turn 2-D vector array into 1-D array
+    @test funds.value[:,1] ≈ sum(funds.holdings .* stocks.value[1], dims=2)
 
+    @test Func.fundvalinit!(
+    funds.value, funds.holdings, stocks.value, perfwindow[end]) ≈
+    hcat([318, 1003, 692],
+    [327.8755848664943 ,1137.5171362972462, 730.0895512124052],
+    [351.09084866012824, 1187.1302928457408, 764.4838542466905],
+    zeros(3, 3))
 end
 
 @testset "Price Functions" begin
@@ -137,7 +152,7 @@ end
     100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4))
 
     market = Types.MarketIndex(vcat(
-        marketstartval,
+        mktstartval,
         zeros(bigt-1)))
     market.value[2] = 102
 
@@ -146,7 +161,26 @@ end
         zeros(bigm),
         zeros(bigm))
 
+    @test Func.stockmove(
+    2, market.value, stocks.value[2], stocks.beta, stocks.vol)[1] ==
+    ((1 + ((market.value[2]-market.value[1])/market.value[1]) * stocks.beta[1])
+     * stocks.value[1]) + stocks.vol[1] * randn(MersenneTwister(2000)) *
+      stocks.value[1]
 
-    @test Func.stockmove(2, market.value, stocks.value[2], stocks.beta, stocks.vol)[1] == (stocks.value[1] * (1 + ((market.value[2] - market.value[1]) / market.value[1]) * stocks.beta[1])) + stocks.vol[1] * randn(MersenneTwister(2000)) * stocks.value[1]
+end
 
+@testset "Investor Behaviour" begin
+
+    Random.seed!(333333333333333333)
+    @test Func.drawreviewers(bign) == [false, false, true, false]
+
+    Random.seed!(333333333333333333)
+    reviewers = Func.drawreviewers(bign)
+    stocks.value[horizonrange[end]+1] .= Func.stockmove(horizonrange[end]+1)
+    @test Func.perfreview(reviewers, investors, funds.value) ==
+    [false, false, true, false]
+
+horizon: 3
+threshold: 0.06774218278688489
+fund: 3
 end

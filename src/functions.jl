@@ -5,16 +5,17 @@ using Random
 include("params.jl")
 import .Params
 
-function marketmove(currentval, drift=Params.drift, marketvol=Params.marketvol)
+# NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
+function marketmove(currentval, drift, marketvol)
     nextval = currentval*(1 + drift) + marketvol * randn()
     return nextval
     # INCLUDE IN THIS A MARKET IMPACT FACTOR BASED ON PREVIOUS PERIOD TOTAL MARKET IMPACT
 end
 
-function marketinit!(marketval, marketstartval, horizon)
+function marketinit!(marketval, marketstartval, horizon, drift, marketvol)
     marketval[1] = marketstartval
     for t in 2:horizon
-        marketval[t] = Func.marketmove(marketval[t-1])
+        marketval[t] = Func.marketmove(marketval[t-1], drift, marketvol)
     end
     return marketval
 end
@@ -25,13 +26,14 @@ function stockmove(t::Int, mktvals, currentvals, betas, stockvolas)
     return nextvals
 end
 
-function betainit(bigm=Params.bigm, betastd=Params.betastd, betamean=Params.betamean)
-    betas = randn(bigm) .* betastd .+ betamean
+function betainit!(betas, bigm=Params.bigm, betastd=Params.betastd,
+    betamean=Params.betamean)
+    betas .= randn(bigm) .* betastd .+ betamean
     return betas
 end
 
 # Function for a discrete volatility range
-function stockvolinit(volrange=Params.stockvolrange, bigm=Params.bigm)
+function stockvolinit!(stockvol, volrange=Params.stockvolrange, bigm=Params.bigm)
     stockvol = rand(volrange, bigm)
     return stockvol
 end
@@ -74,7 +76,7 @@ function invassetinit!(invassets, caprange, bigk)
     return invassets
 end
 
-function fundvalinit!(fundvals, investorassets)
+function fundcapitalinit!(fundvals, investorassets)
     fundvals[:,1] = sum(investorassets, dims=1)[1:end-1]
     return fundvals
 end
@@ -98,9 +100,23 @@ function fundholdinit!(holdings, portfsizerange, capital, stockvals)
             1 / length(selection) * (capital[k] / stockvals[stock])
         end
     end
-    println("capital", capital)
-    println("holdings", holdings)
     return holdings
 end
+
+function fundvalinit!(fundvals, holdings, stockvals, horizon)
+    bigk = size(fundvals)[1]
+    for t in 2:horizon # t=1 is initialised by fundcapitalinit!
+        for k in 1:bigk
+            fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
+        end
+    end
+    return fundvals
+end
+
+function drawreviewers(bign)
+    reviewers = rand(bign) .< 1/63 # On average, a fund reviews once a quarter
+    return reviewers
+end
+
 
 end  # module Functions
