@@ -6,20 +6,19 @@ using Test, .Params
     @test Params.bigt >= 1
     @test -1< Params.drift <1
     @test Params.marketvol >= 0
-    @test Params.perfwindow[1] <= Params.perfwindow[2]
+    @test Params.perfwindow[1] <= Params.perfwindow[end]
     @test Params.marketstartval > 0
     # Positive starting value required given the multiplicative formula
     @test Params.marketvol >= 0
-    @test Params.perfwindow[1] <= Params.perfwindow[2]
     @test Params.betamean > 0 # The average stock should correlate positively with the index
     @test Params.betastd >= 0
-    @test Params.stockvolrange[2] >= Params.stockvolrange[1] >= 0
-    @test Params.invcaprange[2] >= Params.invcaprange[1] >= 0
+    @test 0 <= Params.stockvolrange[1] <= Params.stockvolrange[end]
+    @test 0 <=Params.invcaprange[1] <= Params.invcaprange[end]
     @test Params.stockstartval >= 0
-    @test Params.horizonrange[1] <= Params.horizonrange[2] < Params.bigt
+    @test Params.horizonrange[1] <= Params.horizonrange[end] < Params.bigt
     @test -1 < Params.thresholdmean < 1
     @test Params.thresholdstd >= 0
-    @test 1 <= Params.portfsizerange[1] <=Params.portfsizerange[end] <=Params.bigm
+    @test 1 <= Params.portfsizerange[1] <= Params.portfsizerange[end] <= Params.bigm
 
     ## TODO: @test Params.stockimpactrange
 
