@@ -15,7 +15,8 @@ const perfwindow = 1:3 # Performance window for investor (1,3)
 # QUESTION: should this be a continuous range or is discrete okay?
 const betamean = 1 # Average stock beta, 1
 const betastd = 0.3 # Stock beta dispersion, 0.3
-const stockstartval = 100
+const stockstartval = 100 # Starting value of stocks
+# TODO: turn into range
 const stockvolrange = range(0.1, stop=0.5, step=0.1)
 # Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
 const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
@@ -66,8 +67,6 @@ rng = MersenneTwister(1)
     [100, 101, 102, 103, 104] +
     [1.1915557734285787, -2.5197330871745263, 2.0748097755419757,
     -0.9732501200602984, -0.1016067940589428])
-
-    @test_broken sum(funds.stakes == 1)
 
     #TODO: stocks integration tests
 
@@ -126,7 +125,8 @@ rng = MersenneTwister(1)
     [0 0 0 318/100 0; 1003/500 0 3009/500 1003/500 0;
     692/200 0 0 692/200 0]
 
-    # TODO: @test funds.value[:,1] == funds.holdings .* stocks.prices[1]
+    @test_broken funds.value[:,1] == sum(funds.holdings .* stocks.value[1], dims=2)
+    # TODO: work out how to turn 2-D vector array into 1-D array
 
 end
 

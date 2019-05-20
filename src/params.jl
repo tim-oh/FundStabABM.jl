@@ -20,5 +20,3 @@ const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 10:100 # Range of number of stocks in funds' portfolio
 rng = MersenneTwister(1999) # Default 'random' number
 end #module
-
-# TODO: turns ranges (a, b) into actual ranges, i.e. a:b
