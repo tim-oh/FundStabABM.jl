@@ -11,26 +11,24 @@ using .Func
 @testset "Market Type" begin
     market = Types.MarketIndex(vcat(
         Params.marketstartval,
-        zeros(Params.big_t-1)))
+        zeros(Params.bigt-1)))
 
     @test isa(market, Types.MarketIndex)
 
     @test typeof(market.value) == Array{Float64, 1}
 
-    @test size(market.value) == (Params.big_t, )
+    @test size(market.value) == (Params.bigt, )
 
     @test market.value[1] == Params.marketstartval
     @test all(market.value .>= 0)
-
-    @test all(Func.marketinit!(market.value, Params.perfwindow[2]) .>= 0)
 end
 
 
 @testset "Stocks Type" begin
     stocks = Types.Equity(
-        zeros(Params.big_m, Params.big_t),
-        zeros(Params.big_m),
-        zeros(Params.big_m))
+        zeros(Params.bigm, Params.bigt),
+        zeros(Params.bigm),
+        zeros(Params.bigm))
 
     @test isa(stocks, Types.Equity)
 
@@ -38,9 +36,9 @@ end
     @test typeof(stocks.vol) == Array{Float64, 1}
     @test typeof(stocks.beta) == Array{Float64, 1}
 
-    @test size(stocks.value) == (Params.big_m, Params.big_t)
-    @test size(stocks.beta) == (Params.big_m,)
-    @test size(stocks.vol) == (Params.big_m,)
+    @test size(stocks.value) == (Params.bigm, Params.bigt)
+    @test size(stocks.beta) == (Params.bigm,)
+    @test size(stocks.vol) == (Params.bigm,)
 
     @test all(stocks.value .>= 0)
     @test all(stocks.vol .>= 0)
@@ -50,9 +48,9 @@ end
 
 @testset "Fund Type" begin
     funds = Types.EquityFund(
-    zeros(Params.big_k, Params.big_m),
-    zeros(Params.big_k, Params.big_n),
-    zeros(Params.big_k, Params.big_t))
+    zeros(Params.bigk, Params.bigm),
+    zeros(Params.bigk, Params.bign),
+    zeros(Params.bigk, Params.bigt))
 
     @test isa(funds, Types.EquityFund)
 
@@ -64,31 +62,31 @@ end
     @test all(funds.stakes .>= 0)
     @test all(funds.value .>= 0)
 
-    @test size(funds.holdings) == (Params.big_k, Params.big_m)
-    @test size(funds.stakes) == (Params.big_k, Params.big_n)
-    @test size(funds.value) == (Params.big_k, Params.big_t)
+    @test size(funds.holdings) == (Params.bigk, Params.bigm)
+    @test size(funds.stakes) == (Params.bigk, Params.bign)
+    @test size(funds.value) == (Params.bigk, Params.bigt)
 end
 
 
 @testset "Investor Type" begin
     investors = Types.RetailInvestor(
-    zeros(Params.big_n, Params.big_k + 1),
-    zeros(Params.big_n),
-    zeros(Params.big_n))
+    zeros(Params.bign, Params.bigk + 1),
+    zeros(Params.bign),
+    zeros(Params.bign))
 
     @test isa(investors, Types.RetailInvestor)
 
     @test typeof(investors.assets) == Array{Float64, 2}
-    @test typeof(investors.horizon) == Array{Float64, 1}
+    @test typeof(investors.horizon) == Array{Int64, 1}
     @test typeof(investors.threshold) == Array{Float64, 1}
 
-    @test size(investors.assets) == (Params.big_n, Params.big_k + 1,)
-    @test size(investors.horizon) == (Params.big_n,)
-    @test size(investors.threshold) == (Params.big_n,)
+    @test size(investors.assets) == (Params.bign, Params.bigk + 1,)
+    @test size(investors.horizon) == (Params.bign,)
+    @test size(investors.threshold) == (Params.bign,)
 
     @test all(investors.assets .>= 0)
     @test all(investors.horizon .>= 0)
-    @test all(investors.threshold .>= 0)
+    @test all(1 .>= investors.threshold .>= -1)
 end
 
 @testset "Market Maker Type" begin

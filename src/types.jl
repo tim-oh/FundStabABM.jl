@@ -20,16 +20,16 @@ struct MarketIndex <: Asset
     value::Array{Float64}
 end
 
+struct RetailInvestor <: Investor
+    assets::Array{Float64} # N possible stakes in M funds and (1) cash
+    horizon::Array{Int64} # Positive integer, draw from range, can use rand(S)
+    threshold::Array{Float64} # ~N(0, 5)
+end
+
 struct EquityFund <: AssetManager
     holdings::Array{Float64}
     stakes::Array{Float64}
     value::Array{Float64}
-end
-
-struct RetailInvestor <: Investor
-    assets::Array{Float64} # N possible stakes in funds and cash
-    horizon::Array{Float64}
-    threshold::Array{Float64}
 end
 
 end # module
