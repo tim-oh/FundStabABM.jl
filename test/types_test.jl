@@ -9,7 +9,7 @@ using .Func
 
 
 @testset "Market Type" begin
-    
+
     market = Types.MarketIndex(vcat(
         Params.marketstartval,
         zeros(Params.bigt-1)))
@@ -30,6 +30,7 @@ end
     stocks = Types.Equity(
         zeros(Params.bigm, Params.bigt),
         zeros(Params.bigm),
+        zeros(Params.bigm),
         zeros(Params.bigm))
 
     @test isa(stocks, Types.Equity)
@@ -37,15 +38,17 @@ end
     @test typeof(stocks.value) == Array{Float64, 2}
     @test typeof(stocks.vol) == Array{Float64, 1}
     @test typeof(stocks.beta) == Array{Float64, 1}
+    @test typeof(stocks.impact) == Array{Float64, 1}
 
     @test size(stocks.value) == (Params.bigm, Params.bigt)
     @test size(stocks.beta) == (Params.bigm,)
     @test size(stocks.vol) == (Params.bigm,)
+    @test size(stocks.impact) == (Params.bigm,)
 
     @test all(stocks.value .>= 0)
     @test all(stocks.vol .>= 0)
     @test all(stocks.beta .>= 0)
-    @test_broken all(stocks.impact .>= 0)
+    @test all(stocks.impact .>= 0)
 end
 
 @testset "Fund Type" begin
@@ -98,4 +101,9 @@ end
     mktmaker = Types.MarketMaker(zeros(Params.bign, Params.bigm))
 
     @test isa(mktmaker, Types.MarketMaker)
+
+    @test typeof(mktmaker.orderbook) == Array{Float64, 2}
+
+    @test size(mktmaker.orderbook) == (Params.bign, Params.bigm)
+
 end

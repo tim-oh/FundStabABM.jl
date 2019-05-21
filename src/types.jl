@@ -16,6 +16,7 @@ struct Equity <: Asset
     value::Array{Float64}
     beta::Array{Float64}
     vol::Array{Float64}
+    impact::Array{Float64}
 end
 
 struct MarketIndex <: Asset

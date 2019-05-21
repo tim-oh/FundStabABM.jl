@@ -44,6 +44,7 @@ rng = MersenneTwister(1)
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
+        zeros(bigm),
         zeros(bigm))
 
     # Generate stock betas
@@ -201,6 +202,7 @@ end
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
+        zeros(bigm),
         zeros(bigm))
 
     @test Func.stockmove(
@@ -230,6 +232,7 @@ drift, marketvol)
 
 stocks = Types.Equity(
     zeros(bigm, bigt),
+    zeros(bigm),
     zeros(bigm),
     zeros(bigm))
 

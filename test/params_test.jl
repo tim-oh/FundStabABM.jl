@@ -18,7 +18,7 @@ using Test, .Params
     @test 0 < Params.horizonrange[1] <= Params.horizonrange[end] < Params.bigt
     @test -1 < Params.thresholdmean < 1
     @test Params.thresholdstd >= 0
-    @test 1 <= Params.portfsizerange[1] <= Params.portfsizerange[end] <= Params.bigm
+    @test 1 <=Params.portfsizerange[1]<=Params.portfsizerange[end] <=Params.bigm
 
     ## TODO: @test Params.stockimpactrange
 
