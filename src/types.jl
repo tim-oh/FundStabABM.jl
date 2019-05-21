@@ -4,6 +4,8 @@ using Random
 include("params.jl")
 import .Params
 
+abstract type Banker end
+
 abstract type Asset end
 
 abstract type AssetManager end
@@ -30,6 +32,10 @@ struct EquityFund <: AssetManager
     holdings::Array{Float64}
     stakes::Array{Float64}
     value::Array{Float64}
+end
+
+struct MarketMaker <: Banker
+    orderbook::Array{Float64}
 end
 
 end # module

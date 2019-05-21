@@ -143,6 +143,48 @@ rng = MersenneTwister(1)
     [327.8755848664943 ,1137.5171362972462, 730.0895512124052],
     [351.09084866012824, 1187.1302928457408, 764.4838542466905],
     zeros(3, 3))
+
+    Random.seed!(333333333333333333)
+    @test Func.drawreviewers(bign) == [3]
+
+    Random.seed!(333333333333333333)
+    reviewers = Func.drawreviewers(bign)
+    funds.value[3, 4] = 730
+
+    Random.seed!(29)
+    investors.horizon .= Func.invhorizoninit!(investors.horizon, horizonrange)
+    Random.seed!(6)
+    investors.threshold .= Func.invthreshinit!(
+    investors.threshold, thresholdmean, thresholdstd)
+    @test Func.perfreview(4, reviewers, investors, funds.value) ==
+    vcat(Array{Int64}(undef, 0, 2), [3 3])
+
+    divestments = vcat([3 3], [4 2])
+    @test Func.liquidate!(funds.holdings, funds.stakes, divestments) ==
+    (vcat(
+    [0.0 0.0 0.0 3.18 0.0],
+    [0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0],
+    [0.0 0.0 0.0 0.0 0.0]),
+    vcat(
+    [-3.46 -0.0 -0.0 -3.46 -0.0 3],
+    [-1.7839999999999998 -0.0 -5.351999999999999 -1.7839999999999998 -0.0 4]),
+    vcat(
+    [1.0 0.0 0.0 0.0],
+    [0.0 1.0 0.0 0.0],
+    [0.0 0.0 0.0 0.0]))
+
+    # TODO: write test that checks that the sum of the sales orders and the
+    # adjusted holdings matches the old holdings
+    # Failed attempt at test that sellorder plus remaining holdings equals
+    # initial holdings
+    #@test Func.liquidate!(
+    #funds.holdings, funds.stakes, divestments)[1][2, :] +
+    #Func.liquidate!(
+    #funds.holdings, funds.stakes, divestments)[2][2, 1:end-1] ==
+    #funds.holdings[2, :]
+
+    #@test Func.marketmake!(stocks.value, sellorders) ==
+
 end
 
 @testset "Price Functions" begin
@@ -171,16 +213,75 @@ end
 
 @testset "Investor Behaviour" begin
 
-    Random.seed!(333333333333333333)
-    @test Func.drawreviewers(bign) == [false, false, true, false]
 
-    Random.seed!(333333333333333333)
-    reviewers = Func.drawreviewers(bign)
-    stocks.value[horizonrange[end]+1] .= Func.stockmove(horizonrange[end]+1)
-    @test Func.perfreview(reviewers, investors, funds.value) ==
-    [false, false, true, false]
 
-horizon: 3
-threshold: 0.06774218278688489
-fund: 3
+#return history:
+#horizon: 3
+#threshold: 0.06774218278688489
+#fund: 3
 end
+
+market = Types.MarketIndex(
+    zeros(bigt))
+
+Random.seed!(0)
+Func.marketinit!(market.value, mktstartval, perfwindow[end],
+drift, marketvol)
+
+stocks = Types.Equity(
+    zeros(bigm, bigt),
+    zeros(bigm),
+    zeros(bigm))
+
+Random.seed!(1)
+Func.betainit!(stocks.beta, bigm, betastd, betamean)
+
+Random.seed!(2)
+Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+
+Random.seed!(3)
+Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
+market.value)
+
+investors = Types.RetailInvestor(
+zeros(bign, bigk + 1),
+zeros(bign),
+zeros(bign))
+
+Random.seed!(29)
+investors.horizon .= Func.invhorizoninit!(investors.horizon, horizonrange)
+
+Random.seed!(6)
+investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
+thresholdstd)
+
+# The first bigk investors put their money in that of the first bigk funds
+# that matches their own index
+Random.seed!(7)
+Func.invassetinit!(investors.assets, invcaprange, bigk)
+
+funds = Types.EquityFund(
+    zeros(bigk, bigm),
+    zeros(bigk, bign),
+    zeros(bigk, bigt))
+
+Func.fundcapitalinit!(funds.value, investors.assets)
+
+Func.fundstakeinit!(funds.stakes, investors.assets)
+
+Random.seed!(8)
+Func.fundholdinit!(
+funds.holdings, portfsizerange, funds.value[:, 1], stocks.value[:, 1])
+
+Func.fundvalinit!(
+funds.value, funds.holdings, stocks.value, perfwindow[end])
+
+
+Random.seed!(333333333333333333)
+reviewers = Func.drawreviewers(bign)
+funds.value[3, 4] = 730
+Func.perfreview(4, reviewers, investors, funds.value)
+
+# NOTE: Something is going wrong, as the code is not generating a long enough
+# history of stock prices and fund values - it should be up to the top end of
+# horizonrange

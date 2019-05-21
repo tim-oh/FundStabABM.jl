@@ -15,7 +15,7 @@ using Test, .Params
     @test 0 <= Params.stockvolrange[1] <= Params.stockvolrange[end]
     @test 0 <=Params.invcaprange[1] <= Params.invcaprange[2]
     @test Params.stockstartval >= 0
-    @test Params.horizonrange[1] <= Params.horizonrange[end] < Params.bigt
+    @test 0 < Params.horizonrange[1] <= Params.horizonrange[end] < Params.bigt
     @test -1 < Params.thresholdmean < 1
     @test Params.thresholdstd >= 0
     @test 1 <= Params.portfsizerange[1] <= Params.portfsizerange[end] <= Params.bigm

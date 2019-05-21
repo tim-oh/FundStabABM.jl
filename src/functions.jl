@@ -115,8 +115,46 @@ end
 
 function drawreviewers(bign)
     reviewers = rand(bign) .< 1/63 # On average, a fund reviews once a quarter
-    return reviewers
+    return findall(reviewers)
 end
 
+function perfreview(t, reviewers, investors, fundvals)
+    divestments = Array{Int64}(undef, 0, 2)
+    for rev in reviewers
+        horizon = investors.horizon[rev]
+        fnds = findall(investors.assets[rev, :] .> 0)
+        for fnd in fnds
+            valchange =
+            (fundvals[fnd,t] - fundvals[fnd, t-horizon]) / fundvals[fnd,horizon]
+            if valchange < investors.threshold[rev]
+                divestments = vcat(divestments, [rev fnd])
+            end
+        end
+    end
+    return divestments
+end
+
+function liquidate!(holdings, stakes, divestments)
+    sellorders = Array{Float64}(undef, 0, size(holdings, 2) + 1)
+    for row in 1:size(divestments, 1)
+        investor = divestments[row, 1]
+        fund = divestments[row, 2]
+
+        # Note the minus
+        sellorder = hcat((holdings[fund,:] .* -stakes[fund,investor])',investor)
+        sellorders = vcat(sellorders, sellorder)
+
+        cashout = (1 - stakes[fund, investor])
+        #@assert cashout + sum(-sellorder[1:end-1]) == holdings[fund, :]
+        # TODO: fix this assert
+        holdings[fund, :] = holdings[fund, :] .* cashout
+
+        stakes[fund, investor] = 0
+        if sum(stakes[fund,: ]) > 0
+            stakes[fund, :] = stakes[fund, :] ./ sum(stakes[fund,: ])
+        end
+    end
+    return holdings, sellorders, stakes
+end
 
 end  # module Functions

@@ -9,6 +9,7 @@ using .Func
 
 
 @testset "Market Type" begin
+    
     market = Types.MarketIndex(vcat(
         Params.marketstartval,
         zeros(Params.bigt-1)))
@@ -25,6 +26,7 @@ end
 
 
 @testset "Stocks Type" begin
+
     stocks = Types.Equity(
         zeros(Params.bigm, Params.bigt),
         zeros(Params.bigm),
@@ -47,6 +49,7 @@ end
 end
 
 @testset "Fund Type" begin
+
     funds = Types.EquityFund(
     zeros(Params.bigk, Params.bigm),
     zeros(Params.bigk, Params.bign),
@@ -69,6 +72,7 @@ end
 
 
 @testset "Investor Type" begin
+
     investors = Types.RetailInvestor(
     zeros(Params.bign, Params.bigk + 1),
     zeros(Params.bign),
@@ -90,5 +94,8 @@ end
 end
 
 @testset "Market Maker Type" begin
-    @test_broken isa(mktmaker, MarketMaker)
+
+    mktmaker = Types.MarketMaker(zeros(Params.bign, Params.bigm))
+
+    @test isa(mktmaker, Types.MarketMaker)
 end
