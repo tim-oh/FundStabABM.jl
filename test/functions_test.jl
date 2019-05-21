@@ -26,6 +26,7 @@ const horizonrange = 1:5
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
+const impactrange = 0.0001:0.0001:0.001 # Stock price impact per currency unit
 rng = MersenneTwister(1)
 
 
@@ -40,6 +41,8 @@ rng = MersenneTwister(1)
     drift, marketvol)
     .>= 0)
     # TODO: Replace inequality with specific values
+
+    # TODO: stocks integration tests
 
     stocks = Types.Equity(
         zeros(bigm, bigt),
@@ -77,9 +80,11 @@ rng = MersenneTwister(1)
     [2.3831115468571573, -25.197330871745265, 14.523668428793831,
     -1.946500240120597, -0.508033970294714])
 
-    # TODO: stocks integration tests
+    Random.seed!(4)
+    @test Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end]) ==
+    [0.0008, 0.0004, 0.0007, 0.0001, 0.0004]
 
-    # TODO: @test stockimpactinit
+
     # TODO: funds integration tests
 
     investors = Types.RetailInvestor(

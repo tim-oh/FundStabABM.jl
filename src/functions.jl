@@ -54,6 +54,11 @@ function stockvalueinit!(
     return stocks.value
 end
 
+function stockimpactinit!(impact, impactrange, horizon)
+    impact .= rand(impactrange, length(impact))
+    return impact
+end
+
 function invhorizoninit!(emptyvals, hrange)
     horizons = rand(hrange, length(emptyvals))
     return horizons

@@ -18,5 +18,6 @@ const horizonrange = 1:100 # Range of investors' evaluation time horizon
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 10:100 # Range of number of stocks in funds' portfolio
+const impactrange = 0.0001:0.0001:0.001 # Stock price impact per currency unit
 rng = MersenneTwister(1999) # Default 'random' number
 end #module
