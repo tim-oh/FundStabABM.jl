@@ -159,17 +159,24 @@ function liquidate!(holdings, stakes, divestments)
             stakes[fund, :] = stakes[fund, :] ./ sum(stakes[fund,: ])
         end
     end
-    return holdings, sellorders, stakes
+    return sellorders, holdings, stakes
 end
 
 # QUESTION: Is marketmake! a good candidate for multiple dispatch, where it uses
 # one method for sales and one for purchases? Would I have to create an
 # abstract 'Order' type that can be a sales or purchase order?
 
-#function marketmake!(stockvals, orders::Sales)
-#    BODYPLEASE
-#    return stockvals, (sellinginvestors, theircash)
-#end
+function marketmake!(stockvals, impacts, t, orders)
+    cashout = Array{Float64}(undef, 0, 2)
+    netimpact = sum(orders[:, 1:end-1], dims=1)' .* impacts
+    stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
+    for order in 1:size(orders, 1)
+        investor = orders[order, end]
+        amount = -sum(orders[order, 1:end-1] .* stockvals[:, t])
+        cashout = vcat(cashout, [investor amount])
+    end
+    return stockvals, cashout
+end
 
 # TODO: Function Disbursement(sellinginvestors,theircash)
 # investors.assets[sellinginvestors, end] = theircash

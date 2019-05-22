@@ -171,12 +171,12 @@ rng = MersenneTwister(1)
     divestments = vcat([3 3], [4 2])
     @test Func.liquidate!(funds.holdings, funds.stakes, divestments) ==
     (vcat(
+    [-3.46 -0.0 -0.0 -3.46 -0.0 3],
+    [-1.7839999999999998 -0.0 -5.351999999999999 -1.7839999999999998 -0.0 4]),
+    vcat(
     [0.0 0.0 0.0 3.18 0.0],
     [0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0],
     [0.0 0.0 0.0 0.0 0.0]),
-    vcat(
-    [-3.46 -0.0 -0.0 -3.46 -0.0 3],
-    [-1.7839999999999998 -0.0 -5.351999999999999 -1.7839999999999998 -0.0 4]),
     vcat(
     [1.0 0.0 0.0 0.0],
     [0.0 1.0 0.0 0.0],
@@ -192,14 +192,23 @@ rng = MersenneTwister(1)
     #funds.holdings, funds.stakes, divestments)[2][2, 1:end-1] ==
     #funds.holdings[2, :]
 
-    @test Func.marketmake!(stocks.value, sellorders) ==
-    ([106.68540785714376 111.63061385709165 104.43603238737349
-    109.79195727243169 107.73685990276314],
-    vcat([3 749.011683348331],
-    [4 945.1372647283855]))
-#    NEW_STOCK_VALS, (INVESTOR=sellorder[end], CASH)
-    # (1) NEW_STOCK_VALS: 1 + (SUM(SELLORDERS) * IMPACT_FACTOR)
-    # (2) CASH: -1 .* QUANTITY OF SALES ORDER * NEW_STOCK_VALS
+    divestments = vcat([3 3], [4 2])
+    sellorders,_,_ = Func.liquidate!(funds.holdings, funds.stakes, divestments)
+
+    stocksvaltst = hcat(ones(5,1) .* 100,
+    [107.903010980603, 80.4519644607866, 118.68295171596901, 103.10552983223091, 103.28424280970195],
+    [110.54316357113026,85.81763860422608,123.6135620896176, 110.40592725161265, 111.56926365234682], zeros(5,3))
+    stocks.value .= stocksvaltst
+
+    @test Func.marketmake!(stocks.value, stocks.impact, 3, vcat([-3.46 -0.0 -0.0 -3.46 -0.0 3.0], [-1.784  -0.0  -5.352  -1.784  -0.0 4.0]))[1] ≈
+    hcat(ones(5,1).*100, [ 107.903010980603, 80.4519644607866, 118.68295171596901, 103.10552983223091, 103.28424280970195],
+    [ 105.9056567729942, 85.81763860422608, 118.98250359949218, 109.82695856910519, 111.56926365234682], zeros(5,3))
+
+    # Need to split these as \approx is required and doesn't work for result tuple
+    stocks.value .= stocksvaltst
+    @test Func.marketmake!(stocks.value, stocks.impact, 3, vcat([-3.46 -0.0 -0.0 -3.46 -0.0 3.0], [-1.784  -0.0  -5.352  -1.784  -0.0 4.0]))[2] == vcat([3.0 746.434849083664],    [4.0 1021.6613450347874])
+
+    @test cashout()
 
 end
 
@@ -228,22 +237,14 @@ end
 
 end
 
-@testset "Investor Behaviour" begin
-
-
-
-#return history:
-#horizon: 3
-#threshold: 0.06774218278688489
-#fund: 3
-end
+#@testset "Investor Behaviour" begin
+#end
 
 market = Types.MarketIndex(
     zeros(bigt))
 
 Random.seed!(0)
-Func.marketinit!(market.value, mktstartval, perfwindow[end],
-drift, marketvol)
+Func.marketinit!(market.value, mktstartval, perfwindow[end], drift, marketvol)
 
 stocks = Types.Equity(
     zeros(bigm, bigt),
@@ -255,11 +256,13 @@ Random.seed!(1)
 Func.betainit!(stocks.beta, bigm, betastd, betamean)
 
 Random.seed!(2)
-Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
 
 Random.seed!(3)
-Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
-market.value)
+Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
+
+Random.seed!(4)
+Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
 
 investors = Types.RetailInvestor(
 zeros(bign, bigk + 1),
