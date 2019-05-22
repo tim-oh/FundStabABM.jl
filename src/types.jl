@@ -35,8 +35,9 @@ struct EquityFund <: AssetManager
     value::Array{Float64}
 end
 
-struct MarketMaker <: Banker
-    orderbook::Array{Float64}
-end
+# MarketMaker perhaps not necessary, doesn't hold any parameters
+#struct MarketMaker <: Banker
+#     orderbook::Array{Float64}
+# end
 
 end # module

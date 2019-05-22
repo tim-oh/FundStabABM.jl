@@ -1,5 +1,6 @@
 using Test, Random, LinearAlgebra
 
+# TODO: Use Reexport to hopefully get rid of WARNIN: replacing module ...
 include("../src/types.jl")
 using .Types
 
@@ -26,7 +27,7 @@ const horizonrange = 1:5
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
-const impactrange = 0.0001:0.0001:0.001 # Stock price impact per currency unit
+const impactrange = 0.001:0.001:0.01 # Stock price impact per currency unit
 rng = MersenneTwister(1)
 
 
@@ -82,8 +83,10 @@ rng = MersenneTwister(1)
 
     Random.seed!(4)
     @test Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end]) ==
-    [0.0008, 0.0004, 0.0007, 0.0001, 0.0004]
+    [0.008, 0.004, 0.007, 0.001, 0.004]
 
+    Random.seed!(4)
+    Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
 
     # TODO: funds integration tests
 
@@ -189,7 +192,14 @@ rng = MersenneTwister(1)
     #funds.holdings, funds.stakes, divestments)[2][2, 1:end-1] ==
     #funds.holdings[2, :]
 
-    #@test Func.marketmake!(stocks.value, sellorders) ==
+    @test Func.marketmake!(stocks.value, sellorders) ==
+    ([106.68540785714376 111.63061385709165 104.43603238737349
+    109.79195727243169 107.73685990276314],
+    vcat([3 749.011683348331],
+    [4 945.1372647283855]))
+#    NEW_STOCK_VALS, (INVESTOR=sellorder[end], CASH)
+    # (1) NEW_STOCK_VALS: 1 + (SUM(SELLORDERS) * IMPACT_FACTOR)
+    # (2) CASH: -1 .* QUANTITY OF SALES ORDER * NEW_STOCK_VALS
 
 end
 

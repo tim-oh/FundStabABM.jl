@@ -96,14 +96,15 @@ end
     @test all(1 .>= investors.threshold .>= -1)
 end
 
-@testset "Market Maker Type" begin
-
-    mktmaker = Types.MarketMaker(zeros(Params.bign, Params.bigm))
-
-    @test isa(mktmaker, Types.MarketMaker)
-
-    @test typeof(mktmaker.orderbook) == Array{Float64, 2}
-
-    @test size(mktmaker.orderbook) == (Params.bign, Params.bigm)
-
-end
+#  Market makes perhaps not necessary
+# @testset "Market Maker Type" begin
+#
+#     mktmaker = Types.MarketMaker(zeros(Params.bign, Params.bigm))
+#
+#     @test isa(mktmaker, Types.MarketMaker)
+#
+#     @test typeof(mktmaker.orderbook) == Array{Float64, 2}
+#
+#     @test size(mktmaker.orderbook) == (Params.bign, Params.bigm)
+#
+#end

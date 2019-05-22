@@ -162,4 +162,20 @@ function liquidate!(holdings, stakes, divestments)
     return holdings, sellorders, stakes
 end
 
+# QUESTION: Is marketmake! a good candidate for multiple dispatch, where it uses
+# one method for sales and one for purchases? Would I have to create an
+# abstract 'Order' type that can be a sales or purchase order?
+
+#function marketmake!(stockvals, orders::Sales)
+#    BODYPLEASE
+#    return stockvals, (sellinginvestors, theircash)
+#end
+
+# TODO: Function Disbursement(sellinginvestors,theircash)
+# investors.assets[sellinginvestors, end] = theircash
+
+# function marketmake!(stocks.value, orders::Purchases)
+#     BODY PLEASE
+# end
+
 end  # module Functions
