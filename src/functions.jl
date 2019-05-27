@@ -2,8 +2,11 @@
 module Func
 using Random
 
-include("params.jl")
-import .Params
+
+#include("params.jl")
+include("types.jl")
+#import .Params
+import .Types
 
 # NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
 function marketmove(currentval, drift, marketvol)
@@ -26,14 +29,16 @@ function stockmove(t::Int, mktvals, currentvals, betas, stockvolas)
     return nextvals
 end
 
-function betainit!(betas, bigm=Params.bigm, betastd=Params.betastd,
-    betamean=Params.betamean)
+# QUESTION: Should I provide default values from Params? This one used to be:
+# betainit!(betas, bigm=Params.bigm, betastd=Params.betastd,
+#    betamean=Params.betamean)
+function betainit!(betas, bigm, betastd, betamean)
     betas .= randn(bigm) .* betastd .+ betamean
     return betas
 end
 
 # Function for a discrete volatility range
-function stockvolinit!(stockvol, volrange=Params.stockvolrange, bigm=Params.bigm)
+function stockvolinit!(stockvol, volrange, bigm)
     stockvol = rand(volrange, bigm)
     return stockvol
 end
@@ -149,10 +154,10 @@ function liquidate!(holdings, stakes, divestments)
         sellorder = hcat((holdings[fund,:] .* -stakes[fund,investor])',investor)
         sellorders = vcat(sellorders, sellorder)
 
-        cashout = (1 - stakes[fund, investor])
+        remainder = (1 - stakes[fund, investor])
         #@assert cashout + sum(-sellorder[1:end-1]) == holdings[fund, :]
         # TODO: fix this assert
-        holdings[fund, :] = holdings[fund, :] .* cashout
+        holdings[fund, :] = holdings[fund, :] .* remainder
 
         stakes[fund, investor] = 0
         if sum(stakes[fund,: ]) > 0
@@ -164,24 +169,41 @@ end
 
 # QUESTION: Is marketmake! a good candidate for multiple dispatch, where it uses
 # one method for sales and one for purchases? Would I have to create an
-# abstract 'Order' type that can be a sales or purchase order?
+# abstract 'Order' type that can be a sales or purchase order?a
 
-function marketmake!(stockvals, impacts, t, orders)
+# TODO: Add description to each function, according to some standard format
+# that should probably inclucde input, output and purpose, plus comments on
+# assumptions or non-obvious points.
+
+# TODO: Market making for sell orders is now impact * number of shares,
+# but it should be impact * value of shares.
+# That means I need to recalculate the test! Bugger.
+
+
+function marketmake!(stockvals, impacts, t, orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
-    netimpact = sum(orders[:, 1:end-1], dims=1)' .* impacts
+    netimpact = sum(orders.values, dims=1)' .* impacts
     stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
-    for order in 1:size(orders, 1)
-        investor = orders[order, end]
-        amount = -sum(orders[order, 1:end-1] .* stockvals[:, t])
+    for order in 1:size(orders.values, 1)
+        investor = orders.investors[order]
+        amount = -sum(orders.values[order, :] .* stockvals[:, t])
         cashout = vcat(cashout, [investor amount])
     end
     return stockvals, cashout
 end
 
-# TODO: Function Disbursement(sellinginvestors,theircash)
-# investors.assets[sellinginvestors, end] = theircash
+function disburse!(invassets, divestments, cashout)
+    for row in 1:size(divestments,1)
+        inv = divestments[row, 1]
+        fund = divestments[row, 2]
+        @assert(inv == cashout[row, 1]) # Ensure divestment matches cashout
+        invassets[inv, fund] = 0
+        invassets[inv, end] = cashout[row, 2]
+    end
+    return invassets
+end
 
-# function marketmake!(stocks.value, orders::Purchases)
+# TODO: function marketmake!(stocks.value, orders::Purchases)
 #     BODY PLEASE
 # end
 

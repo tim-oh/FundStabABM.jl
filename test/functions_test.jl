@@ -199,16 +199,49 @@ rng = MersenneTwister(1)
     [107.903010980603, 80.4519644607866, 118.68295171596901, 103.10552983223091, 103.28424280970195],
     [110.54316357113026,85.81763860422608,123.6135620896176, 110.40592725161265, 111.56926365234682], zeros(5,3))
     stocks.value .= stocksvaltst
+    sellorder = Func.Types.SellMarketOrder(vcat(
+    [-3.46 -0.0 -0.0 -3.46 -0.0], [-1.784  -0.0  -5.352  -1.784  -0.0]),
+    [3, 4])
 
-    @test Func.marketmake!(stocks.value, stocks.impact, 3, vcat([-3.46 -0.0 -0.0 -3.46 -0.0 3.0], [-1.784  -0.0  -5.352  -1.784  -0.0 4.0]))[1] ≈
+    @test Func.marketmake!(stocks.value, stocks.impact, 3, sellorder)[1] ≈
     hcat(ones(5,1).*100, [ 107.903010980603, 80.4519644607866, 118.68295171596901, 103.10552983223091, 103.28424280970195],
     [ 105.9056567729942, 85.81763860422608, 118.98250359949218, 109.82695856910519, 111.56926365234682], zeros(5,3))
 
     # Need to split these as \approx is required and doesn't work for result tuple
     stocks.value .= stocksvaltst
-    @test Func.marketmake!(stocks.value, stocks.impact, 3, vcat([-3.46 -0.0 -0.0 -3.46 -0.0 3.0], [-1.784  -0.0  -5.352  -1.784  -0.0 4.0]))[2] == vcat([3.0 746.434849083664],    [4.0 1021.6613450347874])
+    @test Func.marketmake!(stocks.value, stocks.impact, 3, sellorder)[2] ==
+    vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
 
-    @test cashout()
+    cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
+    divestments = vcat([3 3], [4 2])
+    @test Func.disburse!(investors.assets, divestments, cashout) == vcat([318.0 0.0 0.0 0.0],
+        [0.0 111.0 0.0 0.0],
+        [0.0 0.0 0.0 746.434849083664],
+        [0.0 0.0 0.0 1021.6613450347874])
+
+    resultstuple = Func.liquidate!(funds.holdings, funds.stakes, divestments)
+    @test funds.holdings == resultstuple[2]
+
+    @test_broken fundbirth!(funds)
+    # Identify the funds that need to be respawned.
+    # Make list of funds to be respawned.
+    # Make list of available investors.
+    # For each fund:
+    #   Assign investor, yielding amount of capital.
+    #   Sample new number of equities.
+    #   Order equities.
+
+    # Second process is to assign still-unallocated investors to funds.
+    # For each investor:
+    #   Assign fund
+
+    # 1) Assign funds to investors.
+    # 2) Either directly buy more equities or IF empty spawn a new one.
+    # 3) Buy order to market maker: amount of money for each.
+    # So how does one turn the market impact that's normally quantity into
+    # (a) Use value of order per equity to adjust price.
+    # (b) Calculate number of stocks provided at new price as output.
+    # 4) ...?
 
 end
 
@@ -235,7 +268,7 @@ end
      * stocks.value[1]) + stocks.vol[1] * randn(MersenneTwister(2000)) *
       stocks.value[1]
 
-end
+end # testset "Price Functions"
 
 #@testset "Investor Behaviour" begin
 #end

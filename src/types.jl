@@ -12,6 +12,8 @@ abstract type AssetManager end
 
 abstract type Investor end
 
+abstract type Order end
+
 struct Equity <: Asset
     value::Array{Float64}
     beta::Array{Float64}
@@ -33,6 +35,16 @@ struct EquityFund <: AssetManager
     holdings::Array{Float64}
     stakes::Array{Float64}
     value::Array{Float64}
+end
+
+mutable struct BuyMarketOrder <: Order
+    values::Array{Float64}
+    funds::Array{Int64}
+end
+
+mutable struct SellMarketOrder <: Order
+    values::Array{Float64}
+    investors::Array{Int64}
 end
 
 # MarketMaker perhaps not necessary, doesn't hold any parameters

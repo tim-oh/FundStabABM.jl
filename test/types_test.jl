@@ -96,6 +96,35 @@ end
     @test all(1 .>= investors.threshold .>= -1)
 end
 
+@testset "Order Types" begin
+
+    buyorder = Types.BuyMarketOrder(
+    Array{Float64}(undef, 0, Params.bigm),
+    Array{Int64}(undef, 0))
+
+    sellorder = Types.SellMarketOrder(
+    Array{Float64}(undef, 0, Params.bigm),
+    Array{Int64}(undef, 0))
+
+    @test isa(buyorder, Types.BuyMarketOrder)
+    @test isa(sellorder, Types.SellMarketOrder)
+
+    @test typeof(buyorder.values) == Array{Float64, 2}
+    @test typeof(buyorder.funds) == Array{Int64, 1}
+    @test typeof(sellorder.values) == Array{Float64, 2}
+    @test typeof(sellorder.investors) == Array{Int64, 1}
+
+    @test size(buyorder.values) == (0, Params.bigm)
+    @test size(buyorder.funds) == (0, )
+    @test size(sellorder.values) == (0, Params.bigm)
+    @test size(sellorder.investors) == (0, )
+
+    @test all(buyorder.values .>= 0)
+    @test all(buyorder.funds .>= 0)
+    @test all(sellorder.values .<= 0)
+    @test all(sellorder.investors .>= 0)
+end
+
 #  Market makes perhaps not necessary
 # @testset "Market Maker Type" begin
 #
