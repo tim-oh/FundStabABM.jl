@@ -169,18 +169,29 @@ rng = MersenneTwister(1)
     vcat(Array{Int64}(undef, 0, 2), [3 3])
 
     divestments = vcat([3 3], [4 2])
-    @test Func.liquidate!(funds.holdings, funds.stakes, divestments) ==
-    (vcat(
-    [-3.46 -0.0 -0.0 -3.46 -0.0 3],
-    [-1.7839999999999998 -0.0 -5.351999999999999 -1.7839999999999998 -0.0 4]),
+    @test Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[1].values ≈
+    vcat(
+    [-382.47934595588924  -0.0    -0.0   -382.0045082904202  -0.0],
+    [-197.20899618910363  -0.0  -661.5797843033668 -196.96417421712303  -0.0])
+
+    @test Func.liquidate!(
+    funds.holdings, funds.stakes,stocks.value[:,3], divestments)[1].investors ==
+    [3,4]
+
+    @test Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[2] ==
     vcat(
     [0.0 0.0 0.0 3.18 0.0],
     [0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0],
-    [0.0 0.0 0.0 0.0 0.0]),
+    [0.0 0.0 0.0 0.0 0.0])
+
+    @test Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[3] ==
     vcat(
     [1.0 0.0 0.0 0.0],
     [0.0 1.0 0.0 0.0],
-    [0.0 0.0 0.0 0.0]))
+    [0.0 0.0 0.0 0.0])
 
     # TODO: write test that checks that the sum of the sales orders and the
     # adjusted holdings matches the old holdings
@@ -193,7 +204,8 @@ rng = MersenneTwister(1)
     #funds.holdings[2, :]
 
     divestments = vcat([3 3], [4 2])
-    sellorders,_,_ = Func.liquidate!(funds.holdings, funds.stakes, divestments)
+    sellorders,_,_ = Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
 
     stocksvaltst = hcat(ones(5,1) .* 100,
     [107.903010980603, 80.4519644607866, 118.68295171596901, 103.10552983223091, 103.28424280970195],
@@ -219,10 +231,11 @@ rng = MersenneTwister(1)
         [0.0 0.0 0.0 746.434849083664],
         [0.0 0.0 0.0 1021.6613450347874])
 
-    resultstuple = Func.liquidate!(funds.holdings, funds.stakes, divestments)
+    resultstuple = Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
     @test funds.holdings == resultstuple[2]
 
-    @test_broken fundbirth!(funds)
+    @test fundbirth!(funds)
     # Identify the funds that need to be respawned.
     # Make list of funds to be respawned.
     # Make list of available investors.
@@ -324,8 +337,8 @@ Func.fundcapitalinit!(funds.value, investors.assets)
 Func.fundstakeinit!(funds.stakes, investors.assets)
 
 Random.seed!(8)
-Func.fundholdinit!(
-funds.holdings, portfsizerange, funds.value[:, 1], stocks.value[:, 1])
+Func.fundholdinit!(funds.holdings, portfsizerange, funds.value[:, 1],
+stocks.value[:, 1])
 
 Func.fundvalinit!(
 funds.value, funds.holdings, stocks.value, perfwindow[end])
@@ -335,7 +348,3 @@ Random.seed!(333333333333333333)
 reviewers = Func.drawreviewers(bign)
 funds.value[3, 4] = 730
 Func.perfreview(4, reviewers, investors, funds.value)
-
-# NOTE: Something is going wrong, as the code is not generating a long enough
-# history of stock prices and fund values - it should be up to the top end of
-# horizonrange

@@ -144,19 +144,19 @@ function perfreview(t, reviewers, investors, fundvals)
     return divestments
 end
 
-function liquidate!(holdings, stakes, divestments)
-    sellorders = Array{Float64}(undef, 0, size(holdings, 2) + 1)
+function liquidate!(holdings, stakes, stockvals, divestments)
+    sellorders = Types.SellMarketOrder(
+    Array{Float64}(undef, 0, size(holdings, 2)), Array{Float64}(undef, 0))
     for row in 1:size(divestments, 1)
         investor = divestments[row, 1]
         fund = divestments[row, 2]
 
         # Note the minus
-        sellorder = hcat((holdings[fund,:] .* -stakes[fund,investor])',investor)
-        sellorders = vcat(sellorders, sellorder)
+        salevals = (holdings[fund, :] .* -stakes[fund, investor] .* stockvals)'
+        sellorders.values = vcat(sellorders.values, salevals)
+        sellorders.investors = vcat(sellorders.investors, investor)
 
         remainder = (1 - stakes[fund, investor])
-        #@assert cashout + sum(-sellorder[1:end-1]) == holdings[fund, :]
-        # TODO: fix this assert
         holdings[fund, :] = holdings[fund, :] .* remainder
 
         stakes[fund, investor] = 0
