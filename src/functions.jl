@@ -1,18 +1,20 @@
-
 module Func
 using Random
 
-
-#include("params.jl")
 include("types.jl")
-#import .Params
 import .Types
 
+# QUESTION: Fund value doesn't update automatically each period. Should it?
+
 # NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
+
+# TODO: Add description to each function, according to some standard format
+# that should probably inclucde input, output and purpose, plus comments on
+# assumptions or non-obvious points.
+
 function marketmove(currentval, drift, marketvol)
     nextval = currentval*(1 + drift) + marketvol * randn()
     return nextval
-    # INCLUDE IN THIS A MARKET IMPACT FACTOR BASED ON PREVIOUS PERIOD TOTAL MARKET IMPACT
 end
 
 function marketinit!(marketval, marketstartval, horizon, drift, marketvol)
@@ -29,9 +31,6 @@ function stockmove(t::Int, mktvals, currentvals, betas, stockvolas)
     return nextvals
 end
 
-# QUESTION: Should I provide default values from Params? This one used to be:
-# betainit!(betas, bigm=Params.bigm, betastd=Params.betastd,
-#    betamean=Params.betamean)
 function betainit!(betas, bigm, betastd, betamean)
     betas .= randn(bigm) .* betastd .+ betamean
     return betas
@@ -42,12 +41,6 @@ function stockvolinit!(stockvol, volrange, bigm)
     stockvol = rand(volrange, bigm)
     return stockvol
 end
-
-# Function for a continuous volatility range
-#function stockvolinit(bigm=Params.bigm, volrange=Params.stockvolrange)
-#    stockvol = volrange[1] .+ rand(bigm) .* (volrange[end] - volrange[1])
-#    return stockvol
-#end
 
 function stockvalueinit!(
     stocks, stockstartval, horizon, marketval)
@@ -75,7 +68,7 @@ function invthreshinit!(emptyvals, mean, std)
 end
 
 function invassetinit!(invassets, caprange, bigk)
-    bign = size(invassets)[1]
+    bign = size(invassets, 1)
     capital = rand(caprange[1]:caprange[2], bign)
     for inv in 1:bigk
         invassets[inv, inv] = capital[inv]
@@ -92,7 +85,7 @@ function fundcapitalinit!(fundvals, investorassets)
 end
 
 function fundstakeinit!(fundstakes, investorassets)
-    ncols = size(investorassets)[1] - 1
+    ncols = size(investorassets, 1) - 1
     for col in 1:ncols
         fundstakes[col, :] = investorassets[:, col] ./ sum(investorassets[:, col])
     end
@@ -100,21 +93,21 @@ function fundstakeinit!(fundstakes, investorassets)
 end
 
 function fundholdinit!(holdings, portfsizerange, capital, stockvals)
-    bigk = size(holdings)[1]
-    bigm = size(holdings)[2]
+    bigk = size(holdings, 1)
+    bigm = size(holdings, 2)
     nstocks = rand(portfsizerange, bigk) # Number of stocks in each portfolio
     for k in 1:bigk # Loop over funds
         selection = rand(1:bigm, nstocks[k]) # Randomly select w/ replacement
-        for stock in selection # Loop over
+        for stock in selection # Loop over stocks
             holdings[k, stock] +=
-            1 / length(selection) * (capital[k] / stockvals[stock])
+            (capital[k] / length(selection)) / stockvals[stock]
         end
     end
     return holdings
 end
 
 function fundvalinit!(fundvals, holdings, stockvals, horizon)
-    bigk = size(fundvals)[1]
+    bigk = size(fundvals, 1)
     for t in 2:horizon # t=1 is initialised by fundcapitalinit!
         for k in 1:bigk
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
@@ -167,19 +160,8 @@ function liquidate!(holdings, stakes, stockvals, divestments)
     return sellorders, holdings, stakes
 end
 
-# QUESTION: Is marketmake! a good candidate for multiple dispatch, where it uses
-# one method for sales and one for purchases? Would I have to create an
-# abstract 'Order' type that can be a sales or purchase order?a
 
-# TODO: Add description to each function, according to some standard format
-# that should probably inclucde input, output and purpose, plus comments on
-# assumptions or non-obvious points.
-
-# TODO: Market making for sell orders is now impact * number of shares,
-# but it should be impact * value of shares.
-# That means I need to recalculate the test! Bugger.
-
-
+# TODO: Refactor overlap between marketmake! methods
 function marketmake!(stockvals, impacts, t, orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
     netimpact = sum(orders.values, dims=1)' .* impacts
@@ -190,6 +172,20 @@ function marketmake!(stockvals, impacts, t, orders::Types.SellMarketOrder)
         cashout = vcat(cashout, [investor amount])
     end
     return stockvals, cashout
+end
+
+# TODO: Write a test for marketmake!(buyorder)
+function marketmake!(stockvals, impacts, t, orders::Types.BuyMarketOrder)
+    nstocks = size(stockvals, 2)
+    cashin = Array{Float64}(undef, 0, nstocks+1)
+    netimpact = sum(orders.values, dims=1)' .* impacts
+    stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
+    for order in 1:size(orders.values, 1)
+        fund = orders.funds[order]
+        shares = orders.values[order, :] ./ stockvals[:, t]
+        cashin = vcat(cashin, [fund shares])
+    end
+    return stockvals, cashin
 end
 
 function disburse!(invassets, divestments, cashout)
@@ -203,8 +199,80 @@ function disburse!(invassets, divestments, cashout)
     return invassets
 end
 
-# TODO: function marketmake!(stocks.value, orders::Purchases)
-#     BODY PLEASE
-# end
+# TODO: Write a test for the disburse! method with 2 args
+function disburse!(fundholdings, cashin)
+    for row in 1:size(cashin, 1)
+        fundholdings[cashin[row, 1], :] = cashin[row, 2:end]
+    end
+    return fundholdings
+end
+
+# TODO: Check whether fund values should be updated (here and below too) or not
+
+# TODO: Write a test for respawn!
+function respawn!(funds, investors, t, stockvals)
+    buyorders = Types.SellMarketOrder(
+    Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
+    spawn = findall(vec(sum(funds.holdings, dims=2) .== 0))
+    neggs = length(spawn)
+    potentialinvs = findall(vec(investors.assets[:, end] .> 0))
+    anchorinvs = Random.shuffle(potentialinvs)[1:neggs]
+    for idx in 1:neggs
+        inv = anchorinvs[idx]
+        egg = spawn[idx]
+        capital = investors.assets[inv, end]
+        # Anchor investor notes her investment in the fund
+        investors.assets[inv, egg] = capital
+        investors.assets[inv, end] = 0
+        # Re-use fund holdings init fctn to draw new stocks and generate order
+        buyorder = fundholdinit!(funds.holdings[egg, :], portfsizerange,
+        capital, stockvals[:, t]) * stockvals
+        buyorders.values = vcat(buyorders.values, buyorder)
+        buyorders.funds = vcat(buyorders.funds, egg)
+        # Set anchor investor's stake
+        funds.stakes[egg, inv] = 1
+    end
+    return buyorders, investors.assets, funds.stakes
+end
+
+# TODO: Find a place to put the generation of the fund's return history,
+# hhas to happen after disburse so that we know the holdings, use fundvalinint!:
+# # Compute fund's return history
+# funds.value = fundvalinit!(fundvals, holdings, stockvals, t)
+
+# NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
+# which reduces the flow-performance relationship, especially if many funds die
+
+# Write a test for reinvest
+function reinvest(investors, funds) # NOT COMPLETE! WON'T WORK
+    bigk = size(investors.assets,2) - 1
+
+    buyorders = Types.SellMarketOrder(
+    Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
+
+    reinvestors = findall(vec(investors.assets[:, end] .> 0))
+    for reinv in reinvestors
+        capital = investors.assets[reinv, end]
+        # Choose best-performing fund
+        choice = bestperformer(funds.value, investors.horizon[reinv], t)
+        # Move cash into the fund
+        investors.assets[reinv, choice] = capital
+        investors.assets[reinv, end] = 0
+        #buyorder = ???
+        buyorders = vcat(buyorder, )
+    end
+    return buyorders
+end
+
+# Write a test for bestperformer
+function bestperformer(fundsval, horizon, t)
+    # Return between investor's horizon and now/t
+    horizonreturns =
+    (fundsval[:, t] .- fundsval[:, t-horizon]) ./ fundsval[:, t-horizon]
+    # Index of best-performing fund
+    _, bestfund = findmax(horizonreturns)
+    return bestfund
+end
+
 
 end  # module Functions

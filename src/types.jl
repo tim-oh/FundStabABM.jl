@@ -4,8 +4,6 @@ using Random
 include("params.jl")
 import .Params
 
-abstract type Banker end
-
 abstract type Asset end
 
 abstract type AssetManager end
@@ -15,14 +13,17 @@ abstract type Investor end
 abstract type Order end
 
 struct Equity <: Asset
-    value::Array{Float64}
-    beta::Array{Float64}
-    vol::Array{Float64}
-    impact::Array{Float64}
+    value::Array{Float64} # Value history of each stock
+    beta::Array{Float64} # Stocks' betas
+    vol::Array{Float64} # Stocks' volatilities
+    impact::Array{Float64} # Symmetric price impact for 1 money unit bought/sold
 end
 
+# NOTE: Mismatch between market value and what the index should be worth
+# since the former determines the latter, while it should be vice versa.
+# Implicit assumption is that there are other stocks not traded by our agents.
 struct MarketIndex <: Asset
-    value::Array{Float64}
+    value::Array{Float64} # Index, used to drive stock values
 end
 
 struct RetailInvestor <: Investor
@@ -32,24 +33,19 @@ struct RetailInvestor <: Investor
 end
 
 struct EquityFund <: AssetManager
-    holdings::Array{Float64}
-    stakes::Array{Float64}
-    value::Array{Float64}
+    holdings::Array{Float64} # Units of each stock held in the fund's portfolio
+    stakes::Array{Float64} # Share of assets that each investor in the funds own
+    value::Array{Float64} # Fund's value history
 end
 
 mutable struct BuyMarketOrder <: Order
-    values::Array{Float64}
-    funds::Array{Int64}
+    values::Array{Float64} # Money amount spent on each stock for one of .funds
+    funds::Array{Int64} # Fund that a set of stocks (.values) gets bought for
 end
 
 mutable struct SellMarketOrder <: Order
-    values::Array{Float64}
-    investors::Array{Int64}
+    values::Array{Float64} # Money amount spent on each stock for one of .funds
+    investors::Array{Int64} # Investor that stocks (.values) are liquidated for
 end
-
-# MarketMaker perhaps not necessary, doesn't hold any parameters
-#struct MarketMaker <: Banker
-#     orderbook::Array{Float64}
-# end
 
 end # module
