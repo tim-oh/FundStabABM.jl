@@ -23,7 +23,6 @@ const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
 const impactrange = 0.001:0.001:0.01 # Stock price impact per currency unit
-rng = MersenneTwister(1)
 
 
 @testset "Initialisation Functions" begin
@@ -39,13 +38,12 @@ rng = MersenneTwister(1)
     .>= 0)
     # TODO: Replace inequality with specific values, this one is in params_test
 
+    # Test: generation of stock betas
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
         zeros(bigm))
-
-    # Test: generation of stock betas
     Random.seed!(1)
     @test Func.betainit!(stocks.beta, bigm, betastd, betamean) ==
     1 .+ 0.3 .* randn(MersenneTwister(1), 5)
@@ -55,11 +53,9 @@ rng = MersenneTwister(1)
     @test Func.stockvolinit!(stocks.vol, stockvolrange, bigm) ==
     vec([0.02 0.1 0.07 0.02 0.05])
 
+    # Test: generation of stock values histories
     Random.seed!(2)
     stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
-    # QUESTION: why do I have to assign it explicitly here and not elsewhere?
-
-    # Test: generation of stock values histories
     Random.seed!(3)
     @test Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
     market.value)[:,1:2] ≈
@@ -76,8 +72,6 @@ rng = MersenneTwister(1)
 
     Random.seed!(4)
     Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
-
-    # TODO: funds integration tests
 
     investors = Types.RetailInvestor(
     zeros(bign, bigk + 1),
@@ -292,21 +286,31 @@ end # testset "Initialisation Functions"
     @test funds.holdings == resultstuple[2]
 
     # Test: No more dead funds than investors holding cash
+    divestments = vcat([3 3], [4 2])
     Func.liquidate!(funds.holdings, funds.stakes,stocks.value[:,3], divestments)
     cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
-    divestments = vcat([3 3], [4 2])
     Func.disburse!(investors.assets, divestments, cashout)
     @test length(findall(vec(sum(funds.holdings, dims=2) .== 0))) <=
     length(findall(vec(investors.assets[:, end] .> 0)))
 
     # Test: buyorders
-    @test_broken Func.respawn!(funds, investors, 3, stocks.value)[1] == 0
+    Random.seed!(10)
+    respawn_output = Func.respawn!(
+    funds, investors, 3, stocks.value, portfsizerange)
+    @test respawn_output[1].values ≈
+    [298.574 0.0 149.287 298.574 0.0] atol = 0.0001
+
+    @test respawn_output[1].funds ==
+    [3]
 
     # Test: investors.assets
-    @test_broken Func.respawn!(funds, investors, 3, stocks.value)[2] == 0
+    @test respawn_output[2] ≈
+    vcat([318.0 0.0 0.0 0.0], [0.0 111.0 0.0 0.0],
+    [0.0 0.0 746.435 0.0], [0.0 0.0 0.0 1021.66]) atol = 0.01
 
-    # Test: funds.stakes
-    @test_broken Func.respawn!(funds, investors, 3, stocks.value)[3] == 0
+    # Test: Assignment of stakes to achnor investors
+    @test respawn_output[3] ==
+    vcat([1.0 0.0 0.0 0.0], [0.0 1.0 0.0 0.0], [0.0 0.0 1.0 0.0])
 
 end # testset "Agent Behaviours"
 
@@ -338,12 +342,19 @@ end # testset "Price Functions"
 
 @testset "Integration Tests" begin
 
+    # TODO: funds initialisation integration tests
+    # TODO: market initialisation integration tests
+    # TODO: stocks initialisation integration tests
+    # TODO: investors initialisation integration tests
+    # TODO: other integration tests
 end # testset "Integration Tests"
 
 
 
 
-
+# These lines execute all the functions and keep their results in scope, so that
+# subsequent tests can run. Since tests shouldn't be dependent on each other, I
+# should presumably replace variable args with hardcoded args where possible
 market = Types.MarketIndex(
     zeros(bigt))
 
@@ -400,7 +411,6 @@ stocks.value[:, 1])
 
 Func.fundvalinit!(
 funds.value, funds.holdings, stocks.value, perfwindow[end])
-
 
 Random.seed!(333333333333333333)
 reviewers = Func.drawreviewers(bign)

@@ -107,9 +107,9 @@ function fundholdinit!(holdings, portfsizerange, capital, stockvals)
 end
 
 function fundvalinit!(fundvals, holdings, stockvals, horizon)
-    bigk = size(fundvals, 1)
+    nfunds = size(fundvals, 1)
     for t in 2:horizon # t=1 is initialised by fundcapitalinit!
-        for k in 1:bigk
+        for k in 1:nfunds
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
         end
     end
@@ -207,11 +207,11 @@ function disburse!(fundholdings, cashin)
     return fundholdings
 end
 
-# TODO: Check whether fund values should be updated (here and below too) or not
+# QUESTION: Consider whether fund values should be updated (here and below too)
+# or not respawn updates the value for the reborn funds, or so it seemed to me
 
-# TODO: Write a test for respawn!
-function respawn!(funds, investors, t, stockvals)
-    buyorders = Types.SellMarketOrder(
+function respawn!(funds, investors, t, stockvals, portfsizerange)
+    buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
     spawn = findall(vec(sum(funds.holdings, dims=2) .== 0))
     neggs = length(spawn)
@@ -225,8 +225,8 @@ function respawn!(funds, investors, t, stockvals)
         investors.assets[inv, egg] = capital
         investors.assets[inv, end] = 0
         # Re-use fund holdings init fctn to draw new stocks and generate order
-        buyorder = fundholdinit!(funds.holdings[egg, :], portfsizerange,
-        capital, stockvals[:, t]) * stockvals
+        buyorder = (fundholdinit!(funds.holdings[egg, :]', portfsizerange,
+        capital, stockvals[:, t])' .* stockvals[:, t])'
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, egg)
         # Set anchor investor's stake
@@ -236,7 +236,7 @@ function respawn!(funds, investors, t, stockvals)
 end
 
 # TODO: Find a place to put the generation of the fund's return history,
-# hhas to happen after disburse so that we know the holdings, use fundvalinint!:
+# has to happen after disburse so that we know the holdings, use fundvalinint!:
 # # Compute fund's return history
 # funds.value = fundvalinit!(fundvals, holdings, stockvals, t)
 
@@ -258,8 +258,9 @@ function reinvest(investors, funds) # NOT COMPLETE! WON'T WORK
         # Move cash into the fund
         investors.assets[reinv, choice] = capital
         investors.assets[reinv, end] = 0
-        #buyorder = ???
-        buyorders = vcat(buyorder, )
+        buyorder = []
+        buyorders.values = vcat(buyorders.values, buyorder)
+        buyorders.funds = vcat(buyorders.funds, buyorder)
     end
     return buyorders
 end
