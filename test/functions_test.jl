@@ -22,7 +22,7 @@ const horizonrange = 1:5
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
-const impactrange = 0.001:0.001:0.01 # Stock price impact per currency unit
+const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency unit
 
 
 @testset "Initialisation Functions" begin
@@ -68,7 +68,7 @@ const impactrange = 0.001:0.001:0.01 # Stock price impact per currency unit
     # Test: generation of stock impact parameters
     Random.seed!(4)
     @test Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end]) ==
-    [0.008, 0.004, 0.007, 0.001, 0.004]
+    [0.00008, 0.00004, 0.00007, 0.00001, 0.00004]
 
     Random.seed!(4)
     Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
@@ -106,8 +106,6 @@ const impactrange = 0.001:0.001:0.01 # Stock price impact per currency unit
 
     # Test: At least one investor per fund
     @test all(sum(investors.assets[:,1:end-1] .> 0, dims=1) .>= 1)
-
-    #TODO: investors integration tests
 
     # QUESTION: how do you have separate tests for A) directly after
     #initialisation, and B) following periods. I really want three kinds
@@ -210,31 +208,25 @@ end # testset "Initialisation Functions"
     @test Func.perfreview(4, reviewers, investors, funds.value) ==
     vcat(Array{Int64}(undef, 0, 2), [3 3])
 
-    # Test: Sell order resulting from divestment
+    # Test: Sell order amounts resulting from divestment
     divestments = vcat([3 3], [4 2])
-    @test Func.liquidate!(
-    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[1].values ≈
-    vcat(
+    liquidationresults = Func.liquidate!(
+    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
+    @test liquidationresults[1].values ≈ vcat(
     [-382.47934595588924  -0.0    -0.0   -382.0045082904202  -0.0],
     [-197.20899618910363  -0.0  -661.5797843033668 -196.96417421712303  -0.0])
 
     # Test: Investor that will receive cash following divestment
-    @test Func.liquidate!(
-    funds.holdings, funds.stakes,stocks.value[:,3], divestments)[1].investors ==
-    [3,4]
+    @test liquidationresults[1].investors == [3,4]
 
     # Test: Fund ownership of shares following divestment
-    @test Func.liquidate!(
-    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[2] ==
-    vcat(
+    @test liquidationresults[2] == vcat(
     [0.0 0.0 0.0 3.18 0.0],
     [0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0],
     [0.0 0.0 0.0 0.0 0.0])
 
     # Test: Investor stakes in funds following divestment
-    @test Func.liquidate!(
-    funds.holdings, funds.stakes, stocks.value[:, 3], divestments)[3] ==
-    vcat(
+    @test liquidationresults[3] == vcat(
     [1.0 0.0 0.0 0.0],
     [0.0 1.0 0.0 0.0],
     [0.0 0.0 0.0 0.0])
@@ -251,25 +243,26 @@ end # testset "Initialisation Functions"
 
     # Test: Market impact resulting from divestment-driven sales
     divestments = vcat([3 3], [4 2])
-    stocksvaltst = hcat(ones(5,1) .* 100,
+    priorstockvals = hcat(ones(5,1) .* 100,
     [107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
     [110.54316357113026,85.81763860422608,123.6135620896176,
     110.40592725161265, 111.56926365234682], zeros(5,3))
-    stocks.value .= stocksvaltst
+    stocks.value .= priorstockvals
     sellorders = Func.Types.SellMarketOrder(vcat(
-    [-3.46 -0.0 -0.0 -3.46 -0.0], [-1.784  -0.0  -5.352  -1.784  -0.0]), [3, 4])
-    @test Func.marketmake!(stocks, 3, sellorders)[1] ≈
-    hcat(ones(5,1).*100,
+    [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0],
+    [-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]),
+    [3, 4])
+    sellmarketmakeresults = Func.marketmake!(stocks, 3, sellorders)
+    @test sellmarketmakeresults[1] ≈ hcat(ones(5,1).*100,
     [ 107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
-    [ 105.9056567729942, 85.81763860422608, 118.98250359949218,
-    109.82695856910519, 111.56926365234682], zeros(5,3))
+    [105.41671691304936, 85.81763860422608, 117.8889457275222,
+    109.76671150919375, 111.56926365234682], zeros(5,3))
 
     # Test: Investor-cash pair resulting from divestment
-    stocks.value .= stocksvaltst
-    @test Func.marketmake!(stocks, 3, sellorders)[2] ==
-    vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
+    @test sellmarketmakeresults[2] == vcat(
+    [3.0 744.5346623405912], [4.0 1014.8288665706393])
 
     # Test: Updating of investor assets after divested funds are disbursed
     cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
@@ -285,7 +278,7 @@ end # testset "Initialisation Functions"
     funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
     @test funds.holdings == resultstuple[2]
 
-    # Test: No more dead funds than investors holding cash
+    # Test: No greater number of dead funds than investors holding cash
     divestments = vcat([3 3], [4 2])
     Func.liquidate!(funds.holdings, funds.stakes,stocks.value[:,3], divestments)
     cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
@@ -314,27 +307,18 @@ end # testset "Initialisation Functions"
     vcat([1.0 0.0 0.0 0.0], [0.0 1.0 0.0 0.0], [0.0 0.0 1.0 0.0])
 
     # Test: stock values after buying-driven upwards impact
-    stocksvaltst = hcat(ones(5,1) .* 100,
-    [107.903010980603, 80.4519644607866, 118.68295171596901,
-    103.10552983223091, 103.28424280970195],
-    [110.54316357113026,85.81763860422608,123.6135620896176,
-    110.40592725161265, 111.56926365234682], zeros(5,3))
-    stocks.value .= stocksvaltst
     buyorder = respawn_output[1]
-    marketmakeresults = Func.marketmake!(stocks, 3, buyorder)
-
-    # FIXME: Market impact not of same order of magnitude for buying and selling
-    @test marketmakeresults[1] ≈
+    buymarketmakeresults = Func.marketmake!(stocks, 3, buyorder)
+    @test buymarketmakeresults[1] ≈
     hcat(ones(5,1) .* 100,
       [107.903010980603, 80.4519644607866, 118.68295171596901,
       103.10552983223091, 103.28424280970195],
-      [374.5856797318, 85.8176386042, 252.7908469953,
-      143.3702665748, 111.5692636523],
-      zeros(5,3)) atol = 0.0001
+      [107.93469217989708, 85.81763860422608, 119.12089582037991,
+       110.09444637041521, 111.56926365234682], zeros(5,3)) atol = 0.0001
 
     # Test: Fund-amount of shares pair(s) intended for disbursement
-    @test marketmakeresults[2] ≈
-    [3.0 0.7970779881755 0.0 0.59055540093490 2.0825378032212 0.0] atol=0.000001
+    @test buymarketmakeresults[2] ≈
+    [3.0 2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.000001
 
     # TODO: Test: Disbursement of shares to funds following buy order
 

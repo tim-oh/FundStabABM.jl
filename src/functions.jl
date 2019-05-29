@@ -160,38 +160,36 @@ function liquidate!(holdings, stakes, stockvals, divestments)
     return sellorders, holdings, stakes
 end
 
-
 # TODO: Refactor overlap between marketmake! methods
+# TODO: Move marketmake functions into Price Functions testset
 function marketmake!(stocks, t, orders::Types.SellMarketOrder)
-    stockvals = stocks.value
-    impacts = stocks.impact
     cashout = Array{Float64}(undef, 0, 2)
-    netimpact = sum(orders.values, dims=1)' .* impacts
-    stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
+    netimpact = sum(orders.values, dims=1)' .* stocks.impact
+    oldstockvals = copy(stocks.value)
+    stocks.value[:, t] .= vec((1 .+ netimpact) .* oldstockvals[:, t])
+    priceratio = stocks.value[:, t] ./ oldstockvals[:, t]
     for order in 1:size(orders.values, 1)
         investor = orders.investors[order]
-        amount = -sum(orders.values[order, :] .* stockvals[:, t])
+        amount = -sum(orders.values[order, :] .* priceratio)
         cashout = vcat(cashout, [investor amount])
     end
-    return stockvals, cashout
+    return stocks.value, cashout
 end
 
 # NOTE: Small issue here that sell orders happen first, so sellers get a bad
 # price, followed by buyers who get a good price, ~midmarket as their order
 # neutralises the prior decline. However, the amount they buy is also diminished
 function marketmake!(stocks, t, orders::Types.BuyMarketOrder)
-    stockvals = stocks.value
-    impacts = stocks.impact
-    mstocks = size(stockvals, 1)
-    sharesout = Array{Float64}(undef, 0, mstocks+1)
-    netimpact = sum(orders.values, dims=1)' .* impacts
-    stockvals[:, t] .= vec((1 .+ netimpact) .* stockvals[:, t])
+    mstocks = size(stocks.value, 1)
+    sharesout = Array{Float64}(undef, 0, mstocks + 1)
+    netimpact = sum(orders.values, dims=1)' .* stocks.impact
+    stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
     for order in 1:size(orders.values, 1)
         fund = orders.funds[order]
-        shares = (orders.values[order, :] ./ stockvals[:, t])'
+        shares = (orders.values[order, :] ./ stocks.value[:, t])'
         sharesout = vcat(sharesout, [fund shares])
     end
-    return stockvals, sharesout
+    return stocks.value, sharesout
 end
 
 # Disburse cash to investors following  sell order / divestment
