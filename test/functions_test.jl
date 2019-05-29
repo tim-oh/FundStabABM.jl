@@ -320,52 +320,58 @@ end # testset "Initialisation Functions"
     @test buymarketmakeresults[2] ≈
     [3.0 2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.000001
 
-    # TODO: Test: Disbursement of shares to funds following buy order
+    # Test: Disbursement of shares to fund
+    sharesout = buymarketmakeresults[2]
+    @test Func.disburse!(funds.holdings, sharesout)[3, :] ≈
+    vec([2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0]) atol=0.00001
+
+    # TODO: Test: Initialise values for newly born funds
+    # @test fundreval!(funds, stocks) ==
+    # [692.0, 730.0895512124052, 764.4838542466905, 0.0, 0.0, 0.0]
+
+    # TODO: Write a test for bestperformer
+    # TODO: Write a test for reinvest!
+
 
 end # testset "Agent Behaviours"
 
 
 @testset "Price Functions" begin
 
+    # Test: Random walk of market with drift
     Random.seed!(4)
     @test Func.marketmove(100, 0.05, 0.1) ==
     100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4))
 
+    # Test: Draw of stock price moves on basis of marketmove
     market = Types.MarketIndex(vcat(
         mktstartval,
         zeros(bigt-1)))
     market.value[2] = 102
-
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
         zeros(bigm))
-
     @test Func.stockmove(
     2, market.value, stocks.value[2], stocks.beta, stocks.vol)[1] ==
     ((1 + ((market.value[2]-market.value[1])/market.value[1]) * stocks.beta[1])
      * stocks.value[1]) + stocks.vol[1] * randn(MersenneTwister(2000)) *
       stocks.value[1]
 
-    # Test: Market making / price impact function
+    # Test: Market making / price impact function for buy order
     tmpstock =
     Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
     tmpbuyordervals  = [20 0]
     @test Func.marketmake!(tmpstock, 3, tmpbuyordervals)[:,3] ==
     [122.39999999999999, 98.0]
 
+    # Test: Market making / price impact function for sell order
     tmpstock =
     Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
     tmpsellordervals = [-5 -5]
     @test Func.marketmake!(tmpstock, 3, tmpsellordervals)[:,3] ==
     [96.89999999999999, 73.5]
-
-    function marketmake!(stocks, t, ordervals)
-        netimpact = sum(ordervals, dims=1)' .* stocks.impact
-        stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
-        return stocks.value
-    end
 
 end # testset "Price Functions"
 
@@ -408,8 +414,7 @@ Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
 Random.seed!(4)
 Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
 
-investors = Types.RetailInvestor(
-zeros(bign, bigk + 1),
+investors = Types.RetailInvestor(zeros(bign, bigk + 1),
 zeros(bign),
 zeros(bign))
 
@@ -443,3 +448,22 @@ Random.seed!(333333333333333333)
 reviewers = Func.drawreviewers(bign)
 funds.value[3, 4] = 730
 Func.perfreview(4, reviewers, investors, funds.value)
+
+divestments = vcat([3 3], [4 2])
+liquidationresults = Func.liquidate!(
+funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
+
+sellorders = Func.Types.SellMarketOrder(vcat(
+[-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0],
+[-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]),
+[3, 4])
+sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
+cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
+Func.disburse!(investors.assets, divestments, cashout)
+
+Random.seed!(10)
+respawn_output = Func.respawn!(
+funds, investors, 3, stocks.value, portfsizerange)
+
+buyorder = respawn_output[1]
+buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)

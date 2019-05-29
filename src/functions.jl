@@ -208,17 +208,18 @@ function disburse!(invassets, divestments, cashout)
 end
 
 # Disburse shares to funds following buy order / investment
-# TODO: Write a test for the disburse! method with 2 args
 function disburse!(fundholdings, sharesout)
     for row in 1:size(sharesout, 1)
-        fundholdings[sharesout[row, 1], :] = sharesout[row, 2:end]
+        fund = convert(Int64, sharesout[row, 1])
+        fundholdings[fund, :] = sharesout[row, 2:end]
     end
     return fundholdings
 end
 
-# QUESTION: Consider whether fund values should be updated (here and below too)
-# or not respawn updates the value for the reborn funds, or so it seemed to me.
-# Should check how, as it's also an error of iterating an index too far
+# TODO: Find a place to put the generation of the fund's return history,
+# has to happen after disburse so that we know the holdings, use fundvalinint!:
+# # Compute fund's return history
+# funds.value = fundvalinit!(fundvals, holdings, stockvals, t)
 
 function respawn!(funds, investors, t, stockvals, portfsizerange)
     buyorders = Types.BuyMarketOrder(
@@ -245,16 +246,10 @@ function respawn!(funds, investors, t, stockvals, portfsizerange)
     return buyorders, investors.assets, funds.stakes
 end
 
-# TODO: Find a place to put the generation of the fund's return history,
-# has to happen after disburse so that we know the holdings, use fundvalinint!:
-# # Compute fund's return history
-# funds.value = fundvalinit!(fundvals, holdings, stockvals, t)
-
 # NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
 # which reduces the flow-performance relationship, especially if many funds die
 
-# Write a test for reinvest
-function reinvest(investors, funds) # NOT COMPLETE! WON'T WORK
+function reinvest!(investors, funds) # NOT COMPLETE! WON'T WORK
     kfunds = size(investors.assets,2) - 1
 
     buyorders = Types.SellMarketOrder(
@@ -275,7 +270,6 @@ function reinvest(investors, funds) # NOT COMPLETE! WON'T WORK
     return buyorders
 end
 
-# Write a test for bestperformer
 function bestperformer(fundsval, horizon, t)
     # Return between investor's horizon and now/t
     horizonreturns =
