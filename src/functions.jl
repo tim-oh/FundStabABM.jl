@@ -68,12 +68,12 @@ function invthreshinit!(emptyvals, mean, std)
 end
 
 function invassetinit!(invassets, caprange, bigk)
-    bign = size(invassets, 1)
-    capital = rand(caprange[1]:caprange[2], bign)
+    ninvs = size(invassets, 1)
+    capital = rand(caprange[1]:caprange[2], ninvs)
     for inv in 1:bigk
         invassets[inv, inv] = capital[inv]
     end
-    for inv in (bigk+1):bign
+    for inv in (bigk+1):ninvs
         invassets[inv, rand(1:bigk)] = capital[inv]
     end
     return invassets
@@ -93,11 +93,11 @@ function fundstakeinit!(fundstakes, investorassets)
 end
 
 function fundholdinit!(holdings, portfsizerange, capital, stockvals)
-    bigk = size(holdings, 1)
-    bigm = size(holdings, 2)
-    nstocks = rand(portfsizerange, bigk) # Number of stocks in each portfolio
-    for k in 1:bigk # Loop over funds
-        selection = rand(1:bigm, nstocks[k]) # Randomly select w/ replacement
+    kfunds = size(holdings, 1)
+    mstocks = size(holdings, 2)
+    nofm = rand(portfsizerange, kfunds) # Number of stocks in each portfolio
+    for k in 1:kfunds # Loop over funds
+        selection = rand(1:mstocks, nofm[k]) # Randomly select w/ replacement
         for stock in selection # Loop over stocks
             holdings[k, stock] +=
             (capital[k] / length(selection)) / stockvals[stock]
@@ -107,9 +107,9 @@ function fundholdinit!(holdings, portfsizerange, capital, stockvals)
 end
 
 function fundvalinit!(fundvals, holdings, stockvals, horizon)
-    nfunds = size(fundvals, 1)
+    kfunds = size(fundvals, 1)
     for t in 2:horizon # t=1 is initialised by fundcapitalinit!
-        for k in 1:nfunds
+        for k in 1:kfunds
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
         end
     end
@@ -162,7 +162,9 @@ end
 
 
 # TODO: Refactor overlap between marketmake! methods
-function marketmake!(stockvals, impacts, t, orders::Types.SellMarketOrder)
+function marketmake!(stocks, t, orders::Types.SellMarketOrder)
+    stockvals = stocks.value
+    impacts = stocks.impact
     cashout = Array{Float64}(undef, 0, 2)
     netimpact = sum(orders.values, dims=1)' .* impacts
     stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
@@ -174,20 +176,25 @@ function marketmake!(stockvals, impacts, t, orders::Types.SellMarketOrder)
     return stockvals, cashout
 end
 
-# TODO: Write a test for marketmake!(buyorder)
-function marketmake!(stockvals, impacts, t, orders::Types.BuyMarketOrder)
-    nstocks = size(stockvals, 2)
-    cashin = Array{Float64}(undef, 0, nstocks+1)
+# NOTE: Small issue here that sell orders happen first, so sellers get a bad
+# price, followed by buyers who get a good price, ~midmarket as their order
+# neutralises the prior decline. However, the amount they buy is also diminished
+function marketmake!(stocks, t, orders::Types.BuyMarketOrder)
+    stockvals = stocks.value
+    impacts = stocks.impact
+    mstocks = size(stockvals, 1)
+    sharesout = Array{Float64}(undef, 0, mstocks+1)
     netimpact = sum(orders.values, dims=1)' .* impacts
-    stockvals[:, t] = (1 .+ netimpact) .* stockvals[:, t]
+    stockvals[:, t] .= vec((1 .+ netimpact) .* stockvals[:, t])
     for order in 1:size(orders.values, 1)
         fund = orders.funds[order]
-        shares = orders.values[order, :] ./ stockvals[:, t]
-        cashin = vcat(cashin, [fund shares])
+        shares = (orders.values[order, :] ./ stockvals[:, t])'
+        sharesout = vcat(sharesout, [fund shares])
     end
-    return stockvals, cashin
+    return stockvals, sharesout
 end
 
+# Disburse cash to investors following  sell order / divestment
 function disburse!(invassets, divestments, cashout)
     for row in 1:size(divestments,1)
         inv = divestments[row, 1]
@@ -199,16 +206,18 @@ function disburse!(invassets, divestments, cashout)
     return invassets
 end
 
+# Disburse shares to funds following buy order / investment
 # TODO: Write a test for the disburse! method with 2 args
-function disburse!(fundholdings, cashin)
-    for row in 1:size(cashin, 1)
-        fundholdings[cashin[row, 1], :] = cashin[row, 2:end]
+function disburse!(fundholdings, sharesout)
+    for row in 1:size(sharesout, 1)
+        fundholdings[sharesout[row, 1], :] = sharesout[row, 2:end]
     end
     return fundholdings
 end
 
 # QUESTION: Consider whether fund values should be updated (here and below too)
-# or not respawn updates the value for the reborn funds, or so it seemed to me
+# or not respawn updates the value for the reborn funds, or so it seemed to me.
+# Should check how, as it's also an error of iterating an index too far
 
 function respawn!(funds, investors, t, stockvals, portfsizerange)
     buyorders = Types.BuyMarketOrder(
@@ -245,7 +254,7 @@ end
 
 # Write a test for reinvest
 function reinvest(investors, funds) # NOT COMPLETE! WON'T WORK
-    bigk = size(investors.assets,2) - 1
+    kfunds = size(investors.assets,2) - 1
 
     buyorders = Types.SellMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))

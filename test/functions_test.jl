@@ -259,7 +259,7 @@ end # testset "Initialisation Functions"
     stocks.value .= stocksvaltst
     sellorders = Func.Types.SellMarketOrder(vcat(
     [-3.46 -0.0 -0.0 -3.46 -0.0], [-1.784  -0.0  -5.352  -1.784  -0.0]), [3, 4])
-    @test Func.marketmake!(stocks.value, stocks.impact, 3, sellorders)[1] ≈
+    @test Func.marketmake!(stocks, 3, sellorders)[1] ≈
     hcat(ones(5,1).*100,
     [ 107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
@@ -268,7 +268,7 @@ end # testset "Initialisation Functions"
 
     # Test: Investor-cash pair resulting from divestment
     stocks.value .= stocksvaltst
-    @test Func.marketmake!(stocks.value, stocks.impact, 3, sellorders)[2] ==
+    @test Func.marketmake!(stocks, 3, sellorders)[2] ==
     vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
 
     # Test: Updating of investor assets after divested funds are disbursed
@@ -293,24 +293,50 @@ end # testset "Initialisation Functions"
     @test length(findall(vec(sum(funds.holdings, dims=2) .== 0))) <=
     length(findall(vec(investors.assets[:, end] .> 0)))
 
-    # Test: buyorders
+    # Test: Stock values part of buy order following fund re-birth
     Random.seed!(10)
     respawn_output = Func.respawn!(
     funds, investors, 3, stocks.value, portfsizerange)
     @test respawn_output[1].values ≈
     [298.574 0.0 149.287 298.574 0.0] atol = 0.0001
 
+    # Test: Fund identifier part of buy order following fund re-birth
     @test respawn_output[1].funds ==
     [3]
 
-    # Test: investors.assets
+    # Test: Assets of investors following fund rebirths
     @test respawn_output[2] ≈
     vcat([318.0 0.0 0.0 0.0], [0.0 111.0 0.0 0.0],
     [0.0 0.0 746.435 0.0], [0.0 0.0 0.0 1021.66]) atol = 0.01
 
-    # Test: Assignment of stakes to achnor investors
+    # Test: Investor stakes in funds following fund births
     @test respawn_output[3] ==
     vcat([1.0 0.0 0.0 0.0], [0.0 1.0 0.0 0.0], [0.0 0.0 1.0 0.0])
+
+    # Test: stock values after buying-driven upwards impact
+    stocksvaltst = hcat(ones(5,1) .* 100,
+    [107.903010980603, 80.4519644607866, 118.68295171596901,
+    103.10552983223091, 103.28424280970195],
+    [110.54316357113026,85.81763860422608,123.6135620896176,
+    110.40592725161265, 111.56926365234682], zeros(5,3))
+    stocks.value .= stocksvaltst
+    buyorder = respawn_output[1]
+    marketmakeresults = Func.marketmake!(stocks, 3, buyorder)
+
+    # FIXME: Market impact not of same order of magnitude for buying and selling
+    @test marketmakeresults[1] ≈
+    hcat(ones(5,1) .* 100,
+      [107.903010980603, 80.4519644607866, 118.68295171596901,
+      103.10552983223091, 103.28424280970195],
+      [374.5856797318, 85.8176386042, 252.7908469953,
+      143.3702665748, 111.5692636523],
+      zeros(5,3)) atol = 0.0001
+
+    # Test: Fund-amount of shares pair(s) intended for disbursement
+    @test marketmakeresults[2] ≈
+    [3.0 0.7970779881755 0.0 0.59055540093490 2.0825378032212 0.0] atol=0.000001
+
+    # TODO: Test: Disbursement of shares to funds following buy order
 
 end # testset "Agent Behaviours"
 
@@ -391,8 +417,6 @@ Random.seed!(6)
 investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
 thresholdstd)
 
-# The first bigk investors put their money in that of the first bigk funds
-# that matches their own index
 Random.seed!(7)
 Func.invassetinit!(investors.assets, invcaprange, bigk)
 
