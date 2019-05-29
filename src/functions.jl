@@ -160,9 +160,13 @@ function liquidate!(holdings, stakes, stockvals, divestments)
     return sellorders, holdings, stakes
 end
 
-# TODO: Refactor overlap between marketmake! methods
-# TODO: Move marketmake functions into Price Functions testset
-function marketmake!(stocks, t, orders::Types.SellMarketOrder)
+function marketmake!(stocks, t, ordervals)
+    netimpact = sum(ordervals, dims=1)' .* stocks.impact
+    stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
+    return stocks.value
+end
+
+function executeorder!(stocks, t, orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
     netimpact = sum(orders.values, dims=1)' .* stocks.impact
     oldstockvals = copy(stocks.value)
@@ -179,11 +183,10 @@ end
 # NOTE: Small issue here that sell orders happen first, so sellers get a bad
 # price, followed by buyers who get a good price, ~midmarket as their order
 # neutralises the prior decline. However, the amount they buy is also diminished
-function marketmake!(stocks, t, orders::Types.BuyMarketOrder)
+function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
     mstocks = size(stocks.value, 1)
     sharesout = Array{Float64}(undef, 0, mstocks + 1)
-    netimpact = sum(orders.values, dims=1)' .* stocks.impact
-    stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
+    stocks.value .= marketmake!(stocks, t, orders.values)
     for order in 1:size(orders.values, 1)
         fund = orders.funds[order]
         shares = (orders.values[order, :] ./ stocks.value[:, t])'

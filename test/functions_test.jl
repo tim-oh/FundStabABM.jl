@@ -253,7 +253,7 @@ end # testset "Initialisation Functions"
     [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0],
     [-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]),
     [3, 4])
-    sellmarketmakeresults = Func.marketmake!(stocks, 3, sellorders)
+    sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
     @test sellmarketmakeresults[1] ≈ hcat(ones(5,1).*100,
     [ 107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
@@ -308,7 +308,7 @@ end # testset "Initialisation Functions"
 
     # Test: stock values after buying-driven upwards impact
     buyorder = respawn_output[1]
-    buymarketmakeresults = Func.marketmake!(stocks, 3, buyorder)
+    buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)
     @test buymarketmakeresults[1] ≈
     hcat(ones(5,1) .* 100,
       [107.903010980603, 80.4519644607866, 118.68295171596901,
@@ -347,6 +347,25 @@ end # testset "Agent Behaviours"
     ((1 + ((market.value[2]-market.value[1])/market.value[1]) * stocks.beta[1])
      * stocks.value[1]) + stocks.vol[1] * randn(MersenneTwister(2000)) *
       stocks.value[1]
+
+    # Test: Market making / price impact function
+    tmpstock =
+    Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
+    tmpbuyordervals  = [20 0]
+    @test Func.marketmake!(tmpstock, 3, tmpbuyordervals)[:,3] ==
+    [122.39999999999999, 98.0]
+
+    tmpstock =
+    Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
+    tmpsellordervals = [-5 -5]
+    @test Func.marketmake!(tmpstock, 3, tmpsellordervals)[:,3] ==
+    [96.89999999999999, 73.5]
+
+    function marketmake!(stocks, t, ordervals)
+        netimpact = sum(ordervals, dims=1)' .* stocks.impact
+        stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
+        return stocks.value
+    end
 
 end # testset "Price Functions"
 
