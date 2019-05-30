@@ -111,7 +111,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     #initialisation, and B) following periods. I really want three kinds
     #(pre-initialisation, post-initialisation, during the runs)
 
-    funds = Types.EquityFund(
+    # NOTE Awkware scoping: Func.Types.EquityFund
+    funds = Func.Types.EquityFund(
     zeros(bigk, bigm),
     zeros(bigk, bign),
     zeros(bigk, bigt))
@@ -180,7 +181,8 @@ end # testset "Initialisation Functions"
     thresholdstd)
     Random.seed!(7)
     Func.invassetinit!(investors.assets, invcaprange, bigk)
-    funds = Types.EquityFund(
+    # NOTE Awkware scoping: Func.Types.EquityFund
+    funds = Func.Types.EquityFund(
         zeros(bigk, bigm),
         zeros(bigk, bign),
         zeros(bigk, bigt))
@@ -322,13 +324,13 @@ end # testset "Initialisation Functions"
 
     # Test: Disbursement of shares to fund
     sharesout = buymarketmakeresults[2]
-    @test Func.disburse!(funds.holdings, sharesout) ≈
+    disbursesharesresult = Func.disburse!(funds, sharesout, stocks.value)
+    @test disbursesharesresult.holdings ≈
     vcat([0.0 0.0 0.0 3.18 0.0], [0.222  0.0  0.666  0.222  0.0],
     [2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0]) atol=0.00001
 
     # Test: re-valuation of fund following respawn (NOTE LARGE TOLERANCE)
-    funds.holdings .= Func.disburse!(funds.holdings, sharesout)
-    @test Func.fundreval!(funds, 3, stocks.value) ≈ vcat(
+    @test disbursesharesresult.value ≈ vcat(
     [318.0 327.876 351.091 0.0 0.0 0.0], [1003.0 1137.52 1187.13 0.0 0.0 0.0],
     [673.14668043787 726.8447072826406 746.4349980998603 0.0 0.0 0.0]) atol=0.01
 
@@ -434,7 +436,8 @@ thresholdstd)
 Random.seed!(7)
 Func.invassetinit!(investors.assets, invcaprange, bigk)
 
-funds = Types.EquityFund(
+# NOTE Awkware scoping: Func.Types.EquityFund
+funds = Func.Types.EquityFund(
     zeros(bigk, bigm),
     zeros(bigk, bign),
     zeros(bigk, bigt))

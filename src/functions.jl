@@ -195,31 +195,32 @@ function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
     return stocks.value, sharesout
 end
 
+# Disburse shares to funds following buy order/investment, update value history
+function disburse!(funds::Types.EquityFund, sharesout, stockvals)
+    for row in 1:size(sharesout, 1)
+        fund = convert(Int64, sharesout[row, 1])
+        funds.holdings[fund, :] = sharesout[row, 2:end]
+        funds.value[fund, :] .= vec(funds.holdings[fund, :]' * stockvals)
+    end
+    return funds
+end
+
 # Disburse cash to investors following  sell order / divestment
 function disburse!(invassets, divestments, cashout)
     for row in 1:size(divestments,1)
         inv = divestments[row, 1]
         fund = divestments[row, 2]
-        @assert(inv == cashout[row, 1]) # Ensure divestment matches cashout
+        #@assert(inv == cashout[row, 1]) # Ensure divestment matches cashout
         invassets[inv, fund] = 0
         invassets[inv, end] = cashout[row, 2]
     end
     return invassets
 end
 
-# Disburse shares to funds following buy order / investment
-function disburse!(fundholdings, sharesout)
-    for row in 1:size(sharesout, 1)
-        fund = convert(Int64, sharesout[row, 1])
-        fundholdings[fund, :] = sharesout[row, 2:end]
-    end
-    return fundholdings
-end
-
-function fundreval!(funds, k, stockvals)
-    funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
-    return funds.value
-end
+# function fundreval!(funds, k, stockvals)
+#     funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
+#     return funds.value
+# end
 
 # TODO: Find a place to put the generation of the fund's return history,
 # has to happen after disburse so that we know the holdings, use fundvalinint!:
