@@ -66,11 +66,11 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generation of stock impact parameters
     Random.seed!(4)
-    @test Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end]) ==
+    @test Func.stockimpactinit!(stocks.impact, impactrange) ==
     [0.00008, 0.00004, 0.00007, 0.00001, 0.00004]
 
     Random.seed!(4)
-    Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
+    Func.stockimpactinit!(stocks.impact, impactrange)
 
     investors = Types.RetailInvestor(
     zeros(bign, bigk + 1),
@@ -78,16 +78,18 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     zeros(bign))
 
     # Test: generation of investor performance evaluation horizons
-    Random.seed!(29)
+    Random.seed!(55)
     @test Func.invhorizoninit!(investors.horizon, perfwindow) ==
-    [3, 1, 3, 1]
+    [1, 3, 1, 1]
 
     # Test: generation of investor performance thresholds
-    Random.seed!(6)
+    Random.seed!(2345)
     @test Func.invthreshinit!(investors.threshold, thresholdmean,
     thresholdstd) ==
-    [-0.06570018342662688, 0.00665192247499981,
-    0.06774218278688489, 0.002180862789142308]
+    [0.022728468593375205,
+    -0.03299475538810838,
+     0.12695393970324698,
+    -0.02006345690377245]
 
     # Test: first bigk investors put their money in funds with matching indices
     Random.seed!(7)
@@ -140,12 +142,14 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     @test funds.value[:,1] ≈ sum(funds.holdings .* stocks.value[1], dims=2)
 
     # Test: Generation of fund value history
+    # FIXME: hardcoded 730 as last initialised value
     @test Func.fundvalinit!(
     funds.value, funds.holdings, stocks.value, perfwindow[end]) ≈
     hcat([318, 1003, 692],
     [327.8755848664943 ,1137.5171362972462, 730.0895512124052],
     [351.09084866012824, 1187.1302928457408, 764.4838542466905],
-    zeros(3, 3))
+    [368.98315314801744, 1233.1458121219132, 813.506737945768],
+    zeros(3, 2))
 
 end # testset "Initialisation Functions"
 
@@ -168,14 +172,14 @@ end # testset "Initialisation Functions"
     Random.seed!(3)
     Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
     Random.seed!(4)
-    Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
+    Func.stockimpactinit!(stocks.impact, impactrange)
     investors = Types.RetailInvestor(
     zeros(bign, bigk + 1),
     zeros(bign),
     zeros(bign))
-    Random.seed!(29)
+    Random.seed!(55)
     investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
-    Random.seed!(6)
+    Random.seed!(2345)
     investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
     thresholdstd)
     Random.seed!(7)
@@ -200,10 +204,13 @@ end # testset "Initialisation Functions"
     # Test: Fund-investor pairs for divestment following performance review
     Random.seed!(333333333333333333)
     reviewers = Func.drawreviewers(bign)
-    funds.value[3, 4] = 730
-    Random.seed!(29)
+
+    # QUESTION: In terms of the model dynamics, is there a 'neutral' time to
+    # do the review or the resulting trading?
+
+    Random.seed!(55)
     investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
-    Random.seed!(6)
+    Random.seed!(2345)
     investors.threshold .= Func.invthreshinit!(
     investors.threshold, thresholdmean, thresholdstd)
     @test Func.perfreview(4, reviewers, investors, funds.value) == [3 3]
@@ -244,7 +251,9 @@ end # testset "Initialisation Functions"
     [107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
     [110.54316357113026,85.81763860422608,123.6135620896176,
-    110.40592725161265, 111.56926365234682], zeros(5,3))
+    110.40592725161265, 111.56926365234682],
+    [119.08511622272532, 86.49247760086409, 126.53705519388893,
+    116.03243809686083, 112.85619511929654], zeros(5,2))
     stocks.value .= priorstockvals
     sellorders = Func.Types.SellMarketOrder(
     [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
@@ -255,7 +264,9 @@ end # testset "Initialisation Functions"
     [ 107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
     [105.41671691304936, 85.81763860422608, 117.8889457275222,
-    109.76671150919375, 111.56926365234682], zeros(5,3))
+    109.76671150919375, 111.56926365234682],
+    [119.08511622272532, 86.49247760086409, 126.53705519388893,
+    116.03243809686083, 112.85619511929654], zeros(5,2))
 
     # Test: Investor-cash pair resulting from divestment
     @test sellmarketmakeresults[2] ==
@@ -266,9 +277,9 @@ end # testset "Initialisation Functions"
     divestments = [3 3; 4 2]
     @test Func.disburse!(investors.assets, divestments, cashout) ==
     [318.0 0.0 0.0 0.0;
-    0.0 111.0 0.0 0.0;
-    0.0 0.0 0.0 746.434849083664;
-    0.0 0.0 0.0 1021.6613450347874]
+     0.0 111.0 0.0 0.0;
+     0.0 0.0 0.0 746.434849083664;
+     0.0 0.0 0.0 1021.6613450347874]
 
     # Test: Fund holdings after divestment
     resultstuple = Func.liquidate!(
@@ -283,7 +294,7 @@ end # testset "Initialisation Functions"
     @test length(findall(vec(sum(funds.holdings, dims=2) .== 0))) <=
     length(findall(vec(investors.assets[:, end] .> 0)))
 
-    # Test: Stock values part of buy order following fund re-birth
+    # Test: Stock-values-part of buy order following fund re-birth
     Random.seed!(10)
     respawn_output = Func.respawn!(
     funds, investors, 3, stocks.value, portfsizerange)
@@ -312,10 +323,12 @@ end # testset "Initialisation Functions"
     buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)
     @test buymarketmakeresults[1] ≈
     hcat(ones(5,1) .* 100,
-      [107.903010980603, 80.4519644607866, 118.68295171596901,
-      103.10552983223091, 103.28424280970195],
-      [107.93469217989708, 85.81763860422608, 119.12089582037991,
-       110.09444637041521, 111.56926365234682], zeros(5,3)) atol = 0.0001
+    [107.903010980603, 80.4519644607866, 118.68295171596901,
+     103.10552983223091, 103.28424280970195],
+    [107.93469217989708, 85.81763860422608, 119.12089582037991,
+     110.09444637041521, 111.56926365234682],
+    [119.08511622272532, 86.49247760086409, 126.53705519388893,
+     116.03243809686083, 112.85619511929654], zeros(5,2)) atol = 0.0001
 
     # Test: Fund-amount of shares pair(s) intended for disbursement
     @test buymarketmakeresults[2] ≈
@@ -330,14 +343,21 @@ end # testset "Initialisation Functions"
     2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
 
     # Test: re-valuation of fund following respawn (NOTE Strangely large atol)
+    println("PRINTME", disbursesharesresult.value)
     @test disbursesharesresult.value ≈
-    [318.0 327.876 351.091 0.0 0.0 0.0;
-    1003.0 1137.52 1187.13 0.0 0.0 0.0;
-    673.14668043787 726.8447072826406 746.4349980998603 0.0 0.0 0.0] atol=0.01
+    [318.0 327.8755848664943 351.09084866012824 368.98315314801744 0.0 0.0;
+     1003.0 1137.5171362972462 1187.1302928457408 1233.1458121219132 0.0 0.0;
+     673.14668043787 726.8447072826406 746.4349980998603 802.6776062808188 0.0 0.0] atol=0.001
 
     # Test: Return index of best-performing fund
-    fundvals = [100 101 102; 100 99 104; 100 105 103]
-    @test Func.bestperformer(fundvals, 2, 3) == 2
+    fundvals = [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
+    1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
+    673.14668043787 726.8447072826406 746.4349980998603 730.0 0.0 0.0]
+    horizonmin = perfwindow[1]
+    horizonmax = perfwindow[end]
+
+    @test Func.bestperformer(fundvals, horizonmin, 4) == 1
+    @test Func.bestperformer(fundvals, horizonmax, 4) == 2
 
     println("\nInvestor assets", investors.assets)
     println("\nFund holdings", funds.holdings)
@@ -346,7 +366,7 @@ end # testset "Initialisation Functions"
     println("\nStock values", stocks.value)
 
     # Test: Reallocation of spare investor cash to a fund
-    @test Func.reinvest!(investors, funds, stocks) ==
+    #@test Func.reinvest!(investors, funds, stocks) ==
     [318.0 0.0 0.0 0.0;
      0.0 111.0 0.0 0.0;
      0.0 0.0 746.435 0.0;
@@ -439,16 +459,16 @@ Random.seed!(3)
 Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
 
 Random.seed!(4)
-Func.stockimpactinit!(stocks.impact, impactrange, perfwindow[end])
+Func.stockimpactinit!(stocks.impact, impactrange)
 
 investors = Types.RetailInvestor(zeros(bign, bigk + 1),
 zeros(bign),
 zeros(bign))
 
-Random.seed!(29)
+Random.seed!(55)
 investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
 
-Random.seed!(6)
+Random.seed!(2345)
 investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
 thresholdstd)
 
@@ -474,7 +494,6 @@ funds.value, funds.holdings, stocks.value, perfwindow[end])
 
 Random.seed!(333333333333333333)
 reviewers = Func.drawreviewers(bign)
-funds.value[3, 4] = 730
 Func.perfreview(4, reviewers, investors, funds.value)
 
 divestments = [3 3; 4 2]

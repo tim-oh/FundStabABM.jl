@@ -17,7 +17,7 @@ end
 
 function marketinit!(marketval, marketstartval, horizon, drift, marketvol)
     marketval[1] = marketstartval
-    for t in 2:horizon
+    for t in 2:horizon+1
         marketval[t] = Func.marketmove(marketval[t-1], drift, marketvol)
     end
     return marketval
@@ -43,14 +43,14 @@ end
 function stockvalueinit!(
     stocks, stockstartval, horizon, marketval)
     stocks.value[:,1] .= stockstartval
-    for t in 2:horizon
+    for t in 2:(horizon + 1)
         stocks.value[:, t] = Func.stockmove(
         t, marketval, stocks.value[:, t-1], stocks.beta, stocks.vol)
     end
     return stocks.value
 end
 
-function stockimpactinit!(impact, impactrange, horizon)
+function stockimpactinit!(impact, impactrange)
     impact .= rand(impactrange, length(impact))
     return impact
 end
@@ -106,7 +106,7 @@ end
 
 function fundvalinit!(fundvals, holdings, stockvals, horizon)
     kfunds = size(fundvals, 1)
-    for t in 2:horizon # t=1 is initialised by fundcapitalinit!
+    for t in 2:(horizon + 1) # t=1 is initialised by fundcapitalinit!
         for k in 1:kfunds
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
         end
@@ -272,7 +272,7 @@ end
 function bestperformer(fundsval, horizon, t)
     # Return between investor's horizon and now/t
     horizonreturns =
-    (fundsval[:, t] .- fundsval[:, t-horizon]) ./ fundsval[:, t-horizon]
+    (fundsval[:, t] - fundsval[:, t-horizon]) ./ fundsval[:, t-horizon]
     # Index of best-performing fund
     _, bestfund = findmax(horizonreturns)
     return bestfund
