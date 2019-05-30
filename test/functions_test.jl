@@ -11,14 +11,13 @@ const bigt = 6 # Number of time periods, 6
 const mktstartval = 100 # Market index starting value, 100
 const drift = 0.05 # Market index drift, 0.05
 const marketvol = 0.1 # Market volatility (std?), 0.1
-const perfwindow = 1:3 # Performance window for investor (1,3)
+const perfwindow = 1:3 # Performance window range for investors (1:3)
 const betamean = 1 # Average stock beta, 1
 const betastd = 0.3 # Stock beta dispersion, 0.3
 const stockstartval = 100 # Starting value of stocks
 const stockvolrange = range(0.01, stop=0.1, step=0.01)
 # Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
 const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
-const horizonrange = 1:5
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
@@ -80,8 +79,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generation of investor performance evaluation horizons
     Random.seed!(29)
-    @test Func.invhorizoninit!(investors.horizon, horizonrange) ==
-    [3, 1, 3, 5]
+    @test Func.invhorizoninit!(investors.horizon, perfwindow) ==
+    [3, 1, 3, 1]
 
     # Test: generation of investor performance thresholds
     Random.seed!(6)
@@ -175,7 +174,7 @@ end # testset "Initialisation Functions"
     zeros(bign),
     zeros(bign))
     Random.seed!(29)
-    investors.horizon .= Func.invhorizoninit!(investors.horizon, horizonrange)
+    investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
     Random.seed!(6)
     investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
     thresholdstd)
@@ -203,7 +202,7 @@ end # testset "Initialisation Functions"
     reviewers = Func.drawreviewers(bign)
     funds.value[3, 4] = 730
     Random.seed!(29)
-    investors.horizon .= Func.invhorizoninit!(investors.horizon, horizonrange)
+    investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
     Random.seed!(6)
     investors.threshold .= Func.invthreshinit!(
     investors.threshold, thresholdmean, thresholdstd)
@@ -347,8 +346,12 @@ end # testset "Initialisation Functions"
     println("\nStock values", stocks.value)
 
     # Test: Reallocation of spare investor cash to a fund
-    #@test Func.reinvest!(investors, funds, stocks) ==
-    [318.0 0.0 0.0 0.0; 0.0 111.0 0.0 0.0; 0.0 0.0 746.435 0.0; 0.0 0.0 0.0 1021.66]
+    @test Func.reinvest!(investors, funds, stocks) ==
+    [318.0 0.0 0.0 0.0;
+     0.0 111.0 0.0 0.0;
+     0.0 0.0 746.435 0.0;
+     0.0 0.0 0.0 1021.66]
+
     # TODO: Write a test for reinvest!
     # What does reinvest do? Find investors with cash. Let them choose
     # the best fund for them, invest in that fund. Have those functions already,
@@ -443,7 +446,7 @@ zeros(bign),
 zeros(bign))
 
 Random.seed!(29)
-investors.horizon .= Func.invhorizoninit!(investors.horizon, horizonrange)
+investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
 
 Random.seed!(6)
 investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
