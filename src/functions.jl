@@ -4,8 +4,6 @@ using Random
 include("types.jl")
 import .Types
 
-# QUESTION: Fund value doesn't update automatically each period. Should it?
-
 # NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
 
 # TODO: Add description to each function, according to some standard format
@@ -221,11 +219,6 @@ end
 #     funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
 #     return funds.value
 # end
-
-# TODO: Find a place to put the generation of the fund's return history,
-# has to happen after disburse so that we know the holdings, use fundvalinint!:
-# # Compute fund's return history
-# funds.value = fundvalinit!(fundvals, holdings, stockvals, t)
 
 function respawn!(funds, investors, t, stockvals, portfsizerange)
     buyorders = Types.BuyMarketOrder(

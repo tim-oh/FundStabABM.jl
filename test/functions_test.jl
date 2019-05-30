@@ -207,31 +207,27 @@ end # testset "Initialisation Functions"
     Random.seed!(6)
     investors.threshold .= Func.invthreshinit!(
     investors.threshold, thresholdmean, thresholdstd)
-    @test Func.perfreview(4, reviewers, investors, funds.value) ==
-    vcat(Array{Int64}(undef, 0, 2), [3 3])
+    @test Func.perfreview(4, reviewers, investors, funds.value) == [3 3]
 
     # Test: Sell order amounts resulting from divestment
-    divestments = vcat([3 3], [4 2])
+    divestments = [3 3; 4 2]
     liquidationresults = Func.liquidate!(
     funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
-    @test liquidationresults[1].values ≈ vcat(
-    [-382.47934595588924  -0.0    -0.0   -382.0045082904202  -0.0],
-    [-197.20899618910363  -0.0  -661.5797843033668 -196.96417421712303  -0.0])
+    @test liquidationresults[1].values ≈
+    [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
+    -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]
 
     # Test: Investor that will receive cash following divestment
     @test liquidationresults[1].investors == [3,4]
 
     # Test: Fund ownership of shares following divestment
-    @test liquidationresults[2] == vcat(
-    [0.0 0.0 0.0 3.18 0.0],
-    [0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0],
-    [0.0 0.0 0.0 0.0 0.0])
+    @test liquidationresults[2] == [0.0 0.0 0.0 3.18 0.0;
+    0.22199999999999995 0.0 0.6659999999999997 0.22199999999999995 0.0;
+    0.0 0.0 0.0 0.0 0.0]
 
     # Test: Investor stakes in funds following divestment
-    @test liquidationresults[3] == vcat(
-    [1.0 0.0 0.0 0.0],
-    [0.0 1.0 0.0 0.0],
-    [0.0 0.0 0.0 0.0])
+    @test liquidationresults[3] ==
+    [1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0]
 
     # TODO: write test that checks that the sum of the sales orders and the
     # adjusted holdings matches the old holdings
@@ -244,16 +240,16 @@ end # testset "Initialisation Functions"
     #funds.holdings[2, :]
 
     # Test: Market impact resulting from divestment-driven sales
-    divestments = vcat([3 3], [4 2])
+    divestments = [3 3; 4 2]
     priorstockvals = hcat(ones(5,1) .* 100,
     [107.903010980603, 80.4519644607866, 118.68295171596901,
     103.10552983223091, 103.28424280970195],
     [110.54316357113026,85.81763860422608,123.6135620896176,
     110.40592725161265, 111.56926365234682], zeros(5,3))
     stocks.value .= priorstockvals
-    sellorders = Func.Types.SellMarketOrder(vcat(
-    [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0],
-    [-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]),
+    sellorders = Func.Types.SellMarketOrder(
+    [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
+    -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0],
     [3, 4])
     sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
     @test sellmarketmakeresults[1] ≈ hcat(ones(5,1).*100,
@@ -263,17 +259,17 @@ end # testset "Initialisation Functions"
     109.76671150919375, 111.56926365234682], zeros(5,3))
 
     # Test: Investor-cash pair resulting from divestment
-    @test sellmarketmakeresults[2] == vcat(
-    [3.0 744.5346623405912], [4.0 1014.8288665706393])
+    @test sellmarketmakeresults[2] ==
+    [3.0 744.5346623405912; 4.0 1014.8288665706393]
 
     # Test: Updating of investor assets after divested funds are disbursed
-    cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
-    divestments = vcat([3 3], [4 2])
+    cashout = [3.0 746.434849083664; 4.0 1021.6613450347874]
+    divestments = [3 3; 4 2]
     @test Func.disburse!(investors.assets, divestments, cashout) ==
-    vcat([318.0 0.0 0.0 0.0],
-        [0.0 111.0 0.0 0.0],
-        [0.0 0.0 0.0 746.434849083664],
-        [0.0 0.0 0.0 1021.6613450347874])
+    [318.0 0.0 0.0 0.0;
+    0.0 111.0 0.0 0.0;
+    0.0 0.0 0.0 746.434849083664;
+    0.0 0.0 0.0 1021.6613450347874]
 
     # Test: Fund holdings after divestment
     resultstuple = Func.liquidate!(
@@ -281,9 +277,9 @@ end # testset "Initialisation Functions"
     @test funds.holdings == resultstuple[2]
 
     # Test: No greater number of dead funds than investors holding cash
-    divestments = vcat([3 3], [4 2])
+    divestments = [3 3; 4 2]
     Func.liquidate!(funds.holdings, funds.stakes,stocks.value[:,3], divestments)
-    cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
+    cashout = [3.0 746.434849083664; 4.0 1021.6613450347874]
     Func.disburse!(investors.assets, divestments, cashout)
     @test length(findall(vec(sum(funds.holdings, dims=2) .== 0))) <=
     length(findall(vec(investors.assets[:, end] .> 0)))
@@ -301,12 +297,16 @@ end # testset "Initialisation Functions"
 
     # Test: Assets of investors following fund rebirths
     @test respawn_output[2] ≈
-    vcat([318.0 0.0 0.0 0.0], [0.0 111.0 0.0 0.0],
-    [0.0 0.0 746.435 0.0], [0.0 0.0 0.0 1021.66]) atol = 0.01
+    [318.0 0.0 0.0 0.0;
+     0.0 111.0 0.0 0.0;
+     0.0 0.0 746.435 0.0;
+     0.0 0.0 0.0 1021.66] atol = 0.01
 
     # Test: Investor stakes in funds following fund births
     @test respawn_output[3] ==
-    vcat([1.0 0.0 0.0 0.0], [0.0 1.0 0.0 0.0], [0.0 0.0 1.0 0.0])
+    [1.0 0.0 0.0 0.0;
+     0.0 1.0 0.0 0.0;
+     0.0 0.0 1.0 0.0]
 
     # Test: stock values after buying-driven upwards impact
     buyorder = respawn_output[1]
@@ -326,19 +326,35 @@ end # testset "Initialisation Functions"
     sharesout = buymarketmakeresults[2]
     disbursesharesresult = Func.disburse!(funds, sharesout, stocks.value)
     @test disbursesharesresult.holdings ≈
-    vcat([0.0 0.0 0.0 3.18 0.0], [0.222  0.0  0.666  0.222  0.0],
-    [2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0]) atol=0.00001
+    [0.0 0.0 0.0 3.18 0.0;
+    0.222  0.0  0.666  0.222  0.0;
+    2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
 
-    # Test: re-valuation of fund following respawn (NOTE LARGE TOLERANCE)
-    @test disbursesharesresult.value ≈ vcat(
-    [318.0 327.876 351.091 0.0 0.0 0.0], [1003.0 1137.52 1187.13 0.0 0.0 0.0],
-    [673.14668043787 726.8447072826406 746.4349980998603 0.0 0.0 0.0]) atol=0.01
+    # Test: re-valuation of fund following respawn (NOTE Strangely large atol)
+    @test disbursesharesresult.value ≈
+    [318.0 327.876 351.091 0.0 0.0 0.0;
+    1003.0 1137.52 1187.13 0.0 0.0 0.0;
+    673.14668043787 726.8447072826406 746.4349980998603 0.0 0.0 0.0] atol=0.01
 
     # Test: Return index of best-performing fund
-    fundvals = vcat([100 101 102], [100 99 104], [100 105 103])
+    fundvals = [100 101 102; 100 99 104; 100 105 103]
     @test Func.bestperformer(fundvals, 2, 3) == 2
 
+    println("\nInvestor assets", investors.assets)
+    println("\nFund holdings", funds.holdings)
+    println("\nFund stakes", funds.stakes)
+    println("\nFund values", funds.value)
+    println("\nStock values", stocks.value)
+
+    # Test: Reallocation of spare investor cash to a fund
+    #@test Func.reinvest!(investors, funds, stocks) ==
+    [318.0 0.0 0.0 0.0; 0.0 111.0 0.0 0.0; 0.0 0.0 746.435 0.0; 0.0 0.0 0.0 1021.66]
     # TODO: Write a test for reinvest!
+    # What does reinvest do? Find investors with cash. Let them choose
+    # the best fund for them, invest in that fund. Have those functions already,
+    # can split them out and have reinvest! being an 'integration function'
+
+    # TODO: Write a test for fund value update stepping
 
 
 end # testset "Agent Behaviours"
@@ -458,16 +474,16 @@ reviewers = Func.drawreviewers(bign)
 funds.value[3, 4] = 730
 Func.perfreview(4, reviewers, investors, funds.value)
 
-divestments = vcat([3 3], [4 2])
+divestments = [3 3; 4 2]
 liquidationresults = Func.liquidate!(
 funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
 
-sellorders = Func.Types.SellMarketOrder(vcat(
-[-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0],
-[-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]),
+sellorders = Func.Types.SellMarketOrder(
+[-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
+-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0],
 [3, 4])
 sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
-cashout = vcat([3.0 746.434849083664], [4.0 1021.6613450347874])
+cashout = [3.0 746.434849083664; 4.0 1021.6613450347874]
 Func.disburse!(investors.assets, divestments, cashout)
 
 Random.seed!(10)
