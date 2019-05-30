@@ -216,6 +216,11 @@ function disburse!(fundholdings, sharesout)
     return fundholdings
 end
 
+function fundreval!(funds, k, stockvals)
+    funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
+    return funds.value
+end
+
 # TODO: Find a place to put the generation of the fund's return history,
 # has to happen after disburse so that we know the holdings, use fundvalinint!:
 # # Compute fund's return history

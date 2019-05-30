@@ -322,14 +322,20 @@ end # testset "Initialisation Functions"
 
     # Test: Disbursement of shares to fund
     sharesout = buymarketmakeresults[2]
-    @test Func.disburse!(funds.holdings, sharesout)[3, :] ≈
-    vec([2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0]) atol=0.00001
+    @test Func.disburse!(funds.holdings, sharesout) ≈
+    vcat([0.0 0.0 0.0 3.18 0.0], [0.222  0.0  0.666  0.222  0.0],
+    [2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0]) atol=0.00001
 
-    # TODO: Test: Initialise values for newly born funds
-    # @test fundreval!(funds, stocks) ==
-    # [692.0, 730.0895512124052, 764.4838542466905, 0.0, 0.0, 0.0]
+    # Test: re-valuation of fund following respawn (NOTE LARGE TOLERANCE)
+    funds.holdings .= Func.disburse!(funds.holdings, sharesout)
+    @test Func.fundreval!(funds, 3, stocks.value) ≈ vcat(
+    [318.0 327.876 351.091 0.0 0.0 0.0], [1003.0 1137.52 1187.13 0.0 0.0 0.0],
+    [673.14668043787 726.8447072826406 746.4349980998603 0.0 0.0 0.0]) atol=0.01
 
-    # TODO: Write a test for bestperformer
+    # Test: Return index of best-performing fund
+    fundvals = vcat([100 101 102], [100 99 104], [100 105 103])
+    @test Func.bestperformer(fundvals, 2, 3) == 2
+
     # TODO: Write a test for reinvest!
 
 
