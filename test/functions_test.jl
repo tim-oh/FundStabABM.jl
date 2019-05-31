@@ -340,22 +340,23 @@ end # testset "Initialisation Functions"
     disbursesharesresult = Func.disburse!(funds, sharesout, stocks.value)
     @test disbursesharesresult.holdings ≈
     [0.0 0.0 0.0 3.18 0.0;
-    0.222  0.0  0.666  0.222  0.0;
-    2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
+     0.222  0.0  0.666  0.222  0.0;
+     2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
 
     # Test: re-valuation of fund following respawn
     # NOTE Strangely large atol, plus had to hardcode 802.677.. bug?
     # FIXME: I adjusted the value of the respawned fund, but not of the one
     # that still had an investor left (fund 2)
     @test disbursesharesresult.value ≈
-    [318.0 327.8755848664943 351.09084866012824 368.98315314801744 0.0 0.0;
+    [318.0  327.8755848664943  351.09084866012824 368.98315314801744 0.0 0.0;
      1003.0 1137.5171362972462 1187.1302928457408 1233.1458121219132 0.0 0.0;
      673.1466804 726.844707282 746.434998099 802.677606280 0.0 0.0] atol=0.001
 
     # Test: Return index of best-performing fund for min and max time horizon
-    fundvals = [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
-    1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
-    673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
+    fundvals =
+    [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
+     1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
+     673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
     horizonmin = perfwindow[1]
     horizonmax = perfwindow[end]
     @test Func.bestperformer(fundvals, horizonmin, 4) == 3
@@ -430,6 +431,18 @@ end # testset "Agent Behaviours"
     @test Func.marketmake!(tmpstock, 3, tmpsellordervals)[:,3] ==
     [96.89999999999999, 73.5]
 
+    # Test: Revaluation of funds, can be needed after holdings or prices change
+    # NOTE: Huge atol
+    stocks.value .=
+    [100.0  107.903  107.935   119.085   0.0  0.0;
+     100.0   80.452   85.8176   86.4925  0.0  0.0;
+     100.0  118.683  119.121   126.537   0.0  0.0;
+     100.0  103.106  110.094   116.032   0.0  0.0;
+     100.0  103.284  111.569   112.856   0.0  0.0]
+    @test fundrevalue!(funds, 1:bigk, stocks.value) ≈
+    [318.0   327.876   351.091   368.983  0.0  0.0;
+    110.999999999999 125.886741903284 127.736985080927 136.469775818078 0.0 0.0;
+     0.0  0.0  0.0  0.0  0.0  0.0] atol=1
 end # testset "Price Functions"
 
 @testset "Integration Tests" begin

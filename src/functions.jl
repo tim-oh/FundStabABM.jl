@@ -119,6 +119,8 @@ function drawreviewers(bign)
     return findall(reviewers)
 end
 
+# QUESTION: Is it sufficient to compare fund values or do we need to compare the
+# value of investors' stakes over time?
 function perfreview(t, reviewers, investors, fundvals)
     divestments = Array{Int64}(undef, 0, 2)
     for rev in reviewers
@@ -164,7 +166,6 @@ function marketmake!(stocks, t, ordervals)
     return stocks.value
 end
 
-# FIXME: Call marketmake
 function executeorder!(stocks, t, orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
     oldstockvals = copy(stocks.value)
@@ -216,10 +217,12 @@ function disburse!(funds::Types.EquityFund, sharesout, stockvals)
     return funds
 end
 
-# function fundreval!(funds, k, stockvals)
-#     funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
-#     return funds.value
-# end
+function fundrevalue!(funds, targets, stockvals)
+    for k in targets
+        funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
+    end    
+    return funds.value
+end
 
 function respawn!(funds, investors, t, stockvals, portfsizerange)
     buyorders = Types.BuyMarketOrder(
@@ -280,10 +283,10 @@ function reinvest!(investors, funds, stockvals, t)
     return investors.assets, funds.stakes, buyorders
 end
 
-function bestperformer(fundsval, horizon, t)
+function bestperformer(fundvals, horizon, t)
     # Return between investor's horizon and now/t
     horizonreturns =
-    (fundsval[:, t] - fundsval[:, t-horizon]) ./ fundsval[:, t-horizon]
+    (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
     # Index of best-performing fund
     _, bestfund = findmax(horizonreturns)
     return bestfund
