@@ -60,7 +60,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     market.value)[:,1:2] ≈
     hcat(ones(5,1) .* 100,
     [105.51989943374585, 105.64929533253186, 104.15928328717519,
-    105.05203007235151, 103.79227677999667] +
+     105.05203007235151, 103.79227677999667] +
     [2.3831115468571573, -25.197330871745265, 14.523668428793831,
     -1.946500240120597, -0.508033970294714])
 
@@ -112,7 +112,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     #initialisation, and B) following periods. I really want three kinds
     #(pre-initialisation, post-initialisation, during the runs)
 
-    # NOTE Awkware scoping: Func.Types.EquityFund
+    # NOTE Awkward scoping: Func.Types.EquityFund
     funds = Func.Types.EquityFund(
     zeros(bigk, bigm),
     zeros(bigk, bign),
@@ -125,8 +125,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: Generation of investors' stakes in funds
     @test Func.fundstakeinit!(funds.stakes, investors.assets) ==
     [1.0 0.0 0.0 0.0;
-    0.0 0.1106679960119641 0.0 0.8893320039880359;
-    0.0 0.0 1.0 0.0]
+     0.0 0.1106679960119641 0.0 0.8893320039880359;
+     0.0 0.0 1.0 0.0]
 
     # Test: Investors' stakes sum to one for each fund
     @test sum(funds.stakes, dims=2) == ones(bigk,1)
@@ -135,14 +135,14 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     Random.seed!(8)
     @test Func.fundholdinit!(
     funds.holdings, portfsizerange, funds.value[:, 1], stocks.value[:, 1]) ≈
-    [0 0 0 318/100 0; 1003/500 0 3009/500 1003/500 0;
-    692/200 0 0 692/200 0]
+    [0 0 0 318/100 0;
+     1003/500 0 3009/500 1003/500 0;
+     692/200 0 0 692/200 0]
 
     # Test: Initial fund values equal the value of their holdings
     @test funds.value[:,1] ≈ sum(funds.holdings .* stocks.value[1], dims=2)
 
     # Test: Generation of fund value history
-    # FIXME: hardcoded 730 as last initialised value
     @test Func.fundvalinit!(
     funds.value, funds.holdings, stocks.value, perfwindow[end]) ≈
     hcat([318, 1003, 692],
@@ -159,7 +159,8 @@ end # testset "Initialisation Functions"
     market = Types.MarketIndex(
         zeros(bigt))
     Random.seed!(0)
-    Func.marketinit!(market.value, mktstartval, perfwindow[end], drift, marketvol)
+    Func.marketinit!(
+    market.value, mktstartval, perfwindow[end], drift, marketvol)
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
@@ -184,7 +185,7 @@ end # testset "Initialisation Functions"
     thresholdstd)
     Random.seed!(7)
     Func.invassetinit!(investors.assets, invcaprange, bigk)
-    # NOTE Awkware scoping: Func.Types.EquityFund
+    # NOTE Awkward scoping: Func.Types.EquityFund
     funds = Func.Types.EquityFund(
         zeros(bigk, bigm),
         zeros(bigk, bign),
@@ -221,7 +222,7 @@ end # testset "Initialisation Functions"
     funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
     @test liquidationresults[1].values ≈
     [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
-    -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]
+     -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0]
 
     # Test: Investor that will receive cash following divestment
     @test liquidationresults[1].investors == [3,4]
@@ -249,15 +250,15 @@ end # testset "Initialisation Functions"
     divestments = [3 3; 4 2]
     priorstockvals = hcat(ones(5,1) .* 100,
     [107.903010980603, 80.4519644607866, 118.68295171596901,
-    103.10552983223091, 103.28424280970195],
+     103.10552983223091, 103.28424280970195],
     [110.54316357113026,85.81763860422608,123.6135620896176,
-    110.40592725161265, 111.56926365234682],
+     110.40592725161265, 111.56926365234682],
     [119.08511622272532, 86.49247760086409, 126.53705519388893,
-    116.03243809686083, 112.85619511929654], zeros(5,2))
+     116.03243809686083, 112.85619511929654], zeros(5,2))
     stocks.value .= priorstockvals
     sellorders = Func.Types.SellMarketOrder(
     [-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
-    -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0],
+     -197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0],
     [3, 4])
     sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
     @test sellmarketmakeresults[1] ≈ hcat(ones(5,1).*100,
@@ -318,7 +319,7 @@ end # testset "Initialisation Functions"
      0.0 1.0 0.0 0.0;
      0.0 0.0 1.0 0.0]
 
-    # Test: stock values after buying-driven upwards impact
+    # Test: Stock values after buying-driven upwards impact
     buyorder = respawn_output[1]
     buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)
     @test buymarketmakeresults[1] ≈
@@ -342,46 +343,55 @@ end # testset "Initialisation Functions"
     0.222  0.0  0.666  0.222  0.0;
     2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
 
-    # Test: re-valuation of fund following respawn (NOTE Strangely large atol)
-    println("PRINTME", disbursesharesresult.value)
+    # Test: re-valuation of fund following respawn
+    # NOTE Strangely large atol, plus had to hardcode 802.677.. bug?
+    # FIXME: I adjusted the value of the respawned fund, but not of the one
+    # that still had an investor left (fund 2)
     @test disbursesharesresult.value ≈
     [318.0 327.8755848664943 351.09084866012824 368.98315314801744 0.0 0.0;
      1003.0 1137.5171362972462 1187.1302928457408 1233.1458121219132 0.0 0.0;
-     673.14668043787 726.8447072826406 746.4349980998603 802.6776062808188 0.0 0.0] atol=0.001
+     673.1466804 726.844707282 746.434998099 802.677606280 0.0 0.0] atol=0.001
 
-    # Test: Return index of best-performing fund
+    # Test: Return index of best-performing fund for min and max time horizon
     fundvals = [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
     1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
-    673.14668043787 726.8447072826406 746.4349980998603 730.0 0.0 0.0]
+    673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
     horizonmin = perfwindow[1]
     horizonmax = perfwindow[end]
-
-    @test Func.bestperformer(fundvals, horizonmin, 4) == 1
+    @test Func.bestperformer(fundvals, horizonmin, 4) == 3
     @test Func.bestperformer(fundvals, horizonmax, 4) == 2
 
-    println("\nInvestor assets", investors.assets)
-    println("\nFund holdings", funds.holdings)
-    println("\nFund stakes", funds.stakes)
-    println("\nFund values", funds.value)
-    println("\nStock values", stocks.value)
-
     # Test: Reallocation of spare investor cash to a fund
-    #@test Func.reinvest!(investors, funds, stocks) ==
+    # NOTE: investors.assets don't update automatically, tracks initial investmt
+    reinvestresults = Func.reinvest!(investors, funds, stocks.value, 3)
+    @test reinvestresults[1] ==
     [318.0 0.0 0.0 0.0;
      0.0 111.0 0.0 0.0;
-     0.0 0.0 746.435 0.0;
-     0.0 0.0 0.0 1021.66]
+     0.0 0.0 746.434849083664 0.0;
+     1021.6613450347874 0.0 0.0 0.0]
 
-    # TODO: Write a test for reinvest!
-    # What does reinvest do? Find investors with cash. Let them choose
-    # the best fund for them, invest in that fund. Have those functions already,
-    # can split them out and have reinvest! being an 'integration function'
+    # Test: Update of investor stakes in funds
+    # NOTE: atol quite large due to different calculation of fund value of ~1
+    # There is a general discrepancy between test values and those ins console
+    @test reinvestresults[2] ≈
+    [0.25575690228192466 0.0 0.0 0.7442430977180754;
+     0.0                 1.0 0.0 0.0;
+     0.0                 0.0 1.0 0.0] atol=0.001
+
+    # Test: Each line represents the values of each stock submitted to mkt maker
+    @test reinvestresults[3].values == [0.0 0.0 0.0 1021.6613450347874 0.0]
+
+     # Test: Funds for which will receive proceeds of buy orders
+     @test reinvestresults[3].funds == [1]
+
+    # TODO: Write a test for reinvest where the funds holds more than one stock
 
     # TODO: Write a test for fund value update stepping
 
-
 end # testset "Agent Behaviours"
 
+# TODO: Understand why some values remain within the test function while others
+# are available in the console
 
 @testset "Price Functions" begin
 
@@ -475,7 +485,7 @@ thresholdstd)
 Random.seed!(7)
 Func.invassetinit!(investors.assets, invcaprange, bigk)
 
-# NOTE Awkware scoping: Func.Types.EquityFund
+# NOTE Awkward scoping: Func.Types.EquityFund
 funds = Func.Types.EquityFund(
     zeros(bigk, bigm),
     zeros(bigk, bign),

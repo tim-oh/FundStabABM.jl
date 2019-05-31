@@ -164,11 +164,11 @@ function marketmake!(stocks, t, ordervals)
     return stocks.value
 end
 
+# FIXME: Call marketmake
 function executeorder!(stocks, t, orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
-    netimpact = sum(orders.values, dims=1)' .* stocks.impact
     oldstockvals = copy(stocks.value)
-    stocks.value[:, t] .= vec((1 .+ netimpact) .* oldstockvals[:, t])
+    stocks.value .= marketmake!(stocks, t, orders.values)
     priceratio = stocks.value[:, t] ./ oldstockvals[:, t]
     for order in 1:size(orders.values, 1)
         investor = orders.investors[order]
@@ -193,16 +193,6 @@ function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
     return stocks.value, sharesout
 end
 
-# Disburse shares to funds following buy order/investment, update value history
-function disburse!(funds::Types.EquityFund, sharesout, stockvals)
-    for row in 1:size(sharesout, 1)
-        fund = convert(Int64, sharesout[row, 1])
-        funds.holdings[fund, :] = sharesout[row, 2:end]
-        funds.value[fund, :] .= vec(funds.holdings[fund, :]' * stockvals)
-    end
-    return funds
-end
-
 # Disburse cash to investors following  sell order / divestment
 function disburse!(invassets, divestments, cashout)
     for row in 1:size(divestments,1)
@@ -213,6 +203,17 @@ function disburse!(invassets, divestments, cashout)
         invassets[inv, end] = cashout[row, 2]
     end
     return invassets
+end
+
+# Disburse shares to funds following buy order/investment, update value history
+# QUESTION: Why doesn't the value of funds drop as investors divest?
+function disburse!(funds::Types.EquityFund, sharesout, stockvals)
+    for row in 1:size(sharesout, 1)
+        fund = convert(Int64, sharesout[row, 1])
+        funds.holdings[fund, :] += sharesout[row, 2:end]
+        funds.value[fund, :] .= vec(funds.holdings[fund, :]' * stockvals)
+    end
+    return funds
 end
 
 # function fundreval!(funds, k, stockvals)
@@ -248,25 +249,35 @@ end
 # NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
 # which reduces the flow-performance relationship, especially if many funds die
 
-function reinvest!(investors, funds) # NOT COMPLETE! WON'T WORK
+function reinvest!(investors, funds, stockvals, t)
     kfunds = size(investors.assets,2) - 1
 
-    buyorders = Types.SellMarketOrder(
+    buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
 
     reinvestors = findall(vec(investors.assets[:, end] .> 0))
     for reinv in reinvestors
-        capital = investors.assets[reinv, end]
+        injection = investors.assets[reinv, end]
         # Choose best-performing fund
         choice = bestperformer(funds.value, investors.horizon[reinv], t)
         # Move cash into the fund
-        investors.assets[reinv, choice] = capital
+        investors.assets[reinv, choice] = injection
         investors.assets[reinv, end] = 0
-        buyorder = []
+
+        fundval = funds.holdings[choice, :]' * stockvals[:,t]
+        # QUESTION: Should assert hold true, i.e. funds.value be unchanged?
+        #@assert fundval == funds.value[choice, t]
+        stakevals = funds.stakes[choice, :] .* fundval
+        stakevals[reinv] = injection
+        newcapital = fundval + injection
+        funds.stakes[choice, :] .= stakevals ./ newcapital
+
+        portfoliovalues = funds.holdings[choice, :] .* stockvals[:, t]
+        buyorder = (portfoliovalues ./ fundval)' .* injection
         buyorders.values = vcat(buyorders.values, buyorder)
-        buyorders.funds = vcat(buyorders.funds, buyorder)
+        buyorders.funds = vcat(buyorders.funds, choice)
     end
-    return buyorders
+    return investors.assets, funds.stakes, buyorders
 end
 
 function bestperformer(fundsval, horizon, t)
