@@ -2,8 +2,7 @@ module Func
 using Random
 
 include("types.jl")
-include("params.jl")
-import .Types, .Params
+import .Types
 
 # NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
 
@@ -11,29 +10,15 @@ import .Types, .Params
 # that should probably inclucde input, output and purpose, plus comments on
 # assumptions or non-obvious points.
 
-function marketmove(
-    t,
-    marketvalue=Params.market.value,
-    drift=Params.drift,
-    marketvol=Params.marketvol)
-
-    marketvalue[t] = marketvalue[t-1]*(1 + drift)
-                   + marketvol * randn()
-
-    return marketvalue
+function marketmove(currentval, drift, marketvol)
+    nextval = currentval*(1 + drift) + marketvol * randn()
+    return nextval
 end
 
-function marketinit!(
-    marketval,
-    marketstartval=Params.marketstartval,
-    perfwindow=Params.perfwindow,
-    drift=Params.drift,
-    marketvol=Params.marketvol)
-    
-    horizon = perfwindow[end]
+function marketinit!(marketval, marketstartval, horizon, drift, marketvol)
     marketval[1] = marketstartval
     for t in 2:horizon+1
-        marketval = Func.marketmove(t, marketval, drift, marketvol)
+        marketval[t] = Func.marketmove(marketval[t-1], drift, marketvol)
     end
     return marketval
 end
@@ -222,6 +207,7 @@ function disburse!(invassets, divestments, cashout)
 end
 
 # Disburse shares to funds following buy order/investment, update value history
+# QUESTION: Why doesn't the value of funds drop as investors divest?
 function disburse!(funds::Types.EquityFund, sharesout, stockvals)
     for row in 1:size(sharesout, 1)
         fund = convert(Int64, sharesout[row, 1])
@@ -234,7 +220,7 @@ end
 function fundrevalue!(funds, targets, stockvals)
     for k in targets
         funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
-    end
+    end    
     return funds.value
 end
 

@@ -32,7 +32,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generated market index history is non-negative
     Random.seed!(0)
-    @test all(Func.marketinit!(market.value, mktstartval, perfwindow,
+    @test all(Func.marketinit!(market.value, mktstartval, perfwindow[end],
     drift, marketvol)
     .>= 0)
     # TODO: Replace inequality with specific values, this one is in params_test
@@ -236,7 +236,8 @@ end # testset "Initialisation Functions"
     @test liquidationresults[3] ==
     [1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 0.0 0.0]
 
-    # TODO: write test that checks that the sum of the sales orders and the# adjusted holdings matches the old holdings
+    # TODO: write test that checks that the sum of the sales orders and the
+    # adjusted holdings matches the old holdings
     # Failed attempt at test that sellorder plus remaining holdings equals
     # initial holdings
     #@test Func.liquidate!(
@@ -342,8 +343,10 @@ end # testset "Initialisation Functions"
      0.222  0.0  0.666  0.222  0.0;
      2.7662468291692 0.0 1.25323939995470 2.7119805752548 0.0] atol=0.00001
 
-    # Test: re-valuation of fund 3 following respawn
+    # Test: re-valuation of fund following respawn
     # NOTE Strangely large atol, plus had to hardcode 802.677.. bug?
+    # FIXME: I adjusted the value of the respawned fund, but not of the one
+    # that still had an investor left (fund 2)
     @test disbursesharesresult.value ≈
     [318.0  327.8755848664943  351.09084866012824 368.98315314801744 0.0 0.0;
      1003.0 1137.5171362972462 1187.1302928457408 1233.1458121219132 0.0 0.0;
@@ -382,8 +385,9 @@ end # testset "Initialisation Functions"
      # Test: Funds for which will receive proceeds of buy orders
      @test reinvestresults[3].funds == [1]
 
-    # NOTE: Should write more test cases, e.g. a test for reinvest where the
-    # funds holds more than one stock
+    # TODO: Write a test for reinvest where the funds holds more than one stock
+
+    # TODO: Write a test for fund value update stepping
 
 end # testset "Agent Behaviours"
 
@@ -394,8 +398,7 @@ end # testset "Agent Behaviours"
 
     # Test: Random walk of market with drift
     Random.seed!(4)
-    marketvalue = [100 0.0 0.0 0.0 0.0 0.0]
-    @test Func.marketmove(2, 100, 0.05, 0.1) ==
+    @test Func.marketmove(100, 0.05, 0.1) ==
     100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4))
 
     # Test: Draw of stock price moves on basis of marketmove
@@ -443,5 +446,94 @@ end # testset "Agent Behaviours"
 end # testset "Price Functions"
 
 @testset "Integration Tests" begin
-    # @test
+
+    # TODO: funds initialisation integration tests
+    # TODO: market initialisation integration tests
+    # TODO: stocks initialisation integration tests
+    # TODO: investors initialisation integration tests
+    # TODO: other integration tests
 end # testset "Integration Tests"
+
+
+
+
+# These lines execute all the functions and keep their results in scope, so that
+# subsequent tests can run. Since tests shouldn't be dependent on each other, I
+# should presumably replace variable args with hardcoded args where possible
+market = Types.MarketIndex(
+    zeros(bigt))
+
+Random.seed!(0)
+Func.marketinit!(market.value, mktstartval, perfwindow[end], drift, marketvol)
+
+stocks = Types.Equity(
+    zeros(bigm, bigt),
+    zeros(bigm),
+    zeros(bigm),
+    zeros(bigm))
+
+Random.seed!(1)
+Func.betainit!(stocks.beta, bigm, betastd, betamean)
+
+Random.seed!(2)
+stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+
+Random.seed!(3)
+Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
+
+Random.seed!(4)
+Func.stockimpactinit!(stocks.impact, impactrange)
+
+investors = Types.RetailInvestor(zeros(bign, bigk + 1),
+zeros(bign),
+zeros(bign))
+
+Random.seed!(55)
+investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
+
+Random.seed!(2345)
+investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
+thresholdstd)
+
+Random.seed!(7)
+Func.invassetinit!(investors.assets, invcaprange, bigk)
+
+# NOTE Awkward scoping: Func.Types.EquityFund
+funds = Func.Types.EquityFund(
+    zeros(bigk, bigm),
+    zeros(bigk, bign),
+    zeros(bigk, bigt))
+
+Func.fundcapitalinit!(funds.value, investors.assets)
+
+Func.fundstakeinit!(funds.stakes, investors.assets)
+
+Random.seed!(8)
+Func.fundholdinit!(funds.holdings, portfsizerange, funds.value[:, 1],
+stocks.value[:, 1])
+
+Func.fundvalinit!(
+funds.value, funds.holdings, stocks.value, perfwindow[end])
+
+Random.seed!(333333333333333333)
+reviewers = Func.drawreviewers(bign)
+Func.perfreview(4, reviewers, investors, funds.value)
+
+divestments = [3 3; 4 2]
+liquidationresults = Func.liquidate!(
+funds.holdings, funds.stakes, stocks.value[:, 3], divestments)
+
+sellorders = Func.Types.SellMarketOrder(
+[-382.47934595588924 -0.0 -0.0 -382.0045082904202 -0.0;
+-197.20899618910363 -0.0 -661.5797843033668 -196.96417421712303 -0.0],
+[3, 4])
+sellmarketmakeresults = Func.executeorder!(stocks, 3, sellorders)
+cashout = [3.0 746.434849083664; 4.0 1021.6613450347874]
+Func.disburse!(investors.assets, divestments, cashout)
+
+Random.seed!(10)
+respawn_output = Func.respawn!(
+funds, investors, 3, stocks.value, portfsizerange)
+
+buyorder = respawn_output[1]
+buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)
