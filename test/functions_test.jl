@@ -56,7 +56,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     Random.seed!(2)
     stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
     Random.seed!(3)
-    @test Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)[:,1:2] ≈
+    @test Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
+    market.value)[:,1:2] ≈
     hcat(ones(5,1) .* 100,
     [105.51989943374585, 105.64929533253186, 104.15928328717519,
      105.05203007235151, 103.79227677999667] +
@@ -133,7 +134,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: Generation of fund holdings
     Random.seed!(8)
     @test Func.fundholdinit!(
-    funds.holdings, funds.value[:, 1], stocks.value[:, 1], portfsizerange) ≈
+    funds.holdings, portfsizerange, funds.value[:, 1], stocks.value[:, 1]) ≈
     [0 0 0 318/100 0;
      1003/500 0 3009/500 1003/500 0;
      692/200 0 0 692/200 0]
@@ -143,7 +144,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: Generation of fund value history
     @test Func.fundvalinit!(
-    funds.value, funds.holdings, stocks.value, perfwindow) ≈
+    funds.value, funds.holdings, stocks.value, perfwindow[end]) ≈
     hcat([318, 1003, 692],
     [327.8755848664943 ,1137.5171362972462, 730.0895512124052],
     [351.09084866012824, 1187.1302928457408, 764.4838542466905],
@@ -159,7 +160,7 @@ end # testset "Initialisation Functions"
         zeros(bigt))
     Random.seed!(0)
     Func.marketinit!(
-    market.value, mktstartval, perfwindow, drift, marketvol)
+    market.value, mktstartval, perfwindow[end], drift, marketvol)
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
@@ -170,7 +171,7 @@ end # testset "Initialisation Functions"
     Random.seed!(2)
     stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
     Random.seed!(3)
-    Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)
+    Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
     Random.seed!(4)
     Func.stockimpactinit!(stocks.impact, impactrange)
     investors = Types.RetailInvestor(
@@ -192,10 +193,10 @@ end # testset "Initialisation Functions"
     Func.fundcapitalinit!(funds.value, investors.assets)
     Func.fundstakeinit!(funds.stakes, investors.assets)
     Random.seed!(8)
-    Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value[:, 1],
-    portfsizerange)
+    Func.fundholdinit!(funds.holdings, portfsizerange, funds.value[:, 1],
+    stocks.value[:, 1])
     Func.fundvalinit!(
-    funds.value, funds.holdings, stocks.value, perfwindow)
+    funds.value, funds.holdings, stocks.value, perfwindow[end])
 
     # Test: Random selection of investors that conduct a performance review
     Random.seed!(333333333333333333)
@@ -355,8 +356,8 @@ end # testset "Initialisation Functions"
      673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
     horizonmin = perfwindow[1]
     horizonmax = perfwindow[end]
-    @test Func.bestperformer(fundvals, 4, horizonmin) == 3
-    @test Func.bestperformer(fundvals, 4, horizonmax) == 2
+    @test Func.bestperformer(fundvals, horizonmin, 4) == 3
+    @test Func.bestperformer(fundvals, horizonmax, 4) == 2
 
     # Test: Reallocation of spare investor cash to a fund
     # NOTE: investors.assets don't update automatically, tracks initial investmt
@@ -394,7 +395,7 @@ end # testset "Agent Behaviours"
     # Test: Random walk of market with drift
     Random.seed!(4)
     marketvalue = [100 0.0 0.0 0.0 0.0 0.0]
-    @test Func.marketmove(2, marketvalue, 0.05, 0.1) ==
+    @test Func.marketmove(2, 100, 0.05, 0.1) ==
     100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4))
 
     # Test: Draw of stock price moves on basis of marketmove
@@ -428,14 +429,14 @@ end # testset "Agent Behaviours"
     [96.89999999999999, 73.5]
 
     # Test: Revaluation of funds, can be needed after holdings or prices change
-    # NOTE: Huge atol, requires specification of funds.value, funds.holdings
+    # NOTE: Huge atol
     stocks.value .=
     [100.0  107.903  107.935   119.085   0.0  0.0;
      100.0   80.452   85.8176   86.4925  0.0  0.0;
      100.0  118.683  119.121   126.537   0.0  0.0;
      100.0  103.106  110.094   116.032   0.0  0.0;
      100.0  103.284  111.569   112.856   0.0  0.0]
-    @test_broken Func.fundrevalue!(funds, 1:bigk, stocks.value) ≈
+    @test fundrevalue!(funds, 1:bigk, stocks.value) ≈
     [318.0   327.876   351.091   368.983  0.0  0.0;
     110.999999999999 125.886741903284 127.736985080927 136.469775818078 0.0 0.0;
      0.0  0.0  0.0  0.0  0.0  0.0] atol=1
