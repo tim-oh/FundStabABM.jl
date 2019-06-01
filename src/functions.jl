@@ -29,58 +29,100 @@ function marketinit!(
     perfwindow=Params.perfwindow,
     drift=Params.drift,
     marketvol=Params.marketvol)
-    
+
     horizon = perfwindow[end]
     marketval[1] = marketstartval
     for t in 2:horizon+1
         marketval = Func.marketmove(t, marketval, drift, marketvol)
     end
+
     return marketval
 end
 
-function stockmove(t::Int, mktvals, currentvals, betas, stockvolas)
+function stockmove(
+    t::Int,
+    mktvals,
+    currentvals,
+    betas,
+    stockvolas)
+
     mktreturn = (mktvals[t] - mktvals[t-1]) / mktvals[t-1]
     nextvals = ((1 .+ mktreturn .* betas) .* currentvals) + stockvolas .* randn(length(stockvolas)) .* currentvals
+
     return nextvals
 end
 
-function betainit!(betas, bigm, betastd, betamean)
+function betainit!(
+    betas,
+    bigm=Params.bigm,
+    betastd=Params.betastd,
+    betamean=Params.betamean)
+
     betas .= randn(bigm) .* betastd .+ betamean
+
     return betas
 end
 
 # Function for a discrete volatility range
-function stockvolinit!(stockvol, volrange, bigm)
+function stockvolinit!(
+    stockvol,
+    volrange=Params.stockvolrange,
+    bigm=Params.bigm)
+
     stockvol = rand(volrange, bigm)
+
     return stockvol
 end
 
 function stockvalueinit!(
-    stocks, stockstartval, horizon, marketval)
+    stocks,
+    marketval,
+    stockstartval=Params.stockstartval,
+    perfwindow=Params.perfwindow)
+
+    horizon=perfwindow[end]
     stocks.value[:,1] .= stockstartval
     for t in 2:(horizon + 1)
         stocks.value[:, t] = Func.stockmove(
         t, marketval, stocks.value[:, t-1], stocks.beta, stocks.vol)
     end
+
     return stocks.value
 end
 
-function stockimpactinit!(impact, impactrange)
-    impact .= rand(impactrange, length(impact))
-    return impact
+function stockimpactinit!(
+    impacts,
+    impactrange=Params.impactrange)
+
+    impacts .= rand(impactrange, length(impacts))
+
+    return impacts
 end
 
-function invhorizoninit!(emptyvals, hrange)
+function invhorizoninit!(
+    emptyvals,
+    hrange=Params.perfwindow)
+
     horizons = rand(hrange, length(emptyvals))
+
     return horizons
 end
 
-function invthreshinit!(emptyvals, mean, std)
+function invthreshinit!(
+    emptyvals,
+    mean=Params.thresholdmean,
+    std=Params.thresholdstd)
+
     thresholds = randn(4) * std .+ mean
+
     return thresholds
 end
 
-function invassetinit!(invassets, caprange, bigk)
+function invassetinit!(
+    invassets,
+    caprange=Params.invcaprange,
+    bigk=Params.bigk)
+
     ninvs = size(invassets, 1)
     capital = rand(caprange[1]:caprange[2], ninvs)
     for inv in 1:bigk
@@ -89,23 +131,37 @@ function invassetinit!(invassets, caprange, bigk)
     for inv in (bigk+1):ninvs
         invassets[inv, rand(1:bigk)] = capital[inv]
     end
+
     return invassets
 end
 
-function fundcapitalinit!(fundvals, investorassets)
+function fundcapitalinit!(
+    fundvals,
+    investorassets)
+
     fundvals[:,1] = sum(investorassets, dims=1)[1:end-1]
+
     return fundvals
 end
 
-function fundstakeinit!(fundstakes, investorassets)
+function fundstakeinit!(
+    fundstakes,
+    investorassets)
+
     ncols = size(investorassets, 1) - 1
     for col in 1:ncols
-        fundstakes[col, :] = investorassets[:, col] ./ sum(investorassets[:, col])
+        fundstakes[col,:] = investorassets[:,col] ./ sum(investorassets[:,col])
     end
+
     return fundstakes
 end
 
-function fundholdinit!(holdings, portfsizerange, capital, stockvals)
+function fundholdinit!(
+    holdings,
+    capital,
+    stockvals,
+    portfsizerange=Params.portfsizerange)
+
     kfunds = size(holdings, 1)
     mstocks = size(holdings, 2)
     nofm = rand(portfsizerange, kfunds) # Number of stocks in each portfolio
@@ -116,27 +172,43 @@ function fundholdinit!(holdings, portfsizerange, capital, stockvals)
             (capital[k] / length(selection)) / stockvals[stock]
         end
     end
+
     return holdings
 end
 
-function fundvalinit!(fundvals, holdings, stockvals, horizon)
+function fundvalinit!(
+    fundvals,
+    holdings,
+    stockvals,
+    perfwindow=Params.perfwindow)
+
+    horizon=perfwindow[end]
     kfunds = size(fundvals, 1)
     for t in 2:(horizon + 1) # t=1 is initialised by fundcapitalinit!
         for k in 1:kfunds
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
         end
     end
+
     return fundvals
 end
 
-function drawreviewers(bign)
+function drawreviewers(
+    bign=Params.bign)
+
     reviewers = rand(bign) .< 1/63 # On average, a fund reviews once a quarter
+
     return findall(reviewers)
 end
 
 # QUESTION: Is it sufficient to compare fund values or do we need to compare the
 # value of investors' stakes over time?
-function perfreview(t, reviewers, investors, fundvals)
+function perfreview(
+    t,
+    reviewers,
+    investors,
+    fundvals)
+
     divestments = Array{Int64}(undef, 0, 2)
     for rev in reviewers
         horizon = investors.horizon[rev]
@@ -149,10 +221,16 @@ function perfreview(t, reviewers, investors, fundvals)
             end
         end
     end
+
     return divestments
 end
 
-function liquidate!(holdings, stakes, stockvals, divestments)
+function liquidate!(
+    holdings,
+    stakes,
+    stockvals,
+    divestments)
+
     sellorders = Types.SellMarketOrder(
     Array{Float64}(undef, 0, size(holdings, 2)), Array{Float64}(undef, 0))
     for row in 1:size(divestments, 1)
@@ -172,16 +250,26 @@ function liquidate!(holdings, stakes, stockvals, divestments)
             stakes[fund, :] = stakes[fund, :] ./ sum(stakes[fund,: ])
         end
     end
+
     return sellorders, holdings, stakes
 end
 
-function marketmake!(stocks, t, ordervals)
+function marketmake!(
+    stocks,
+    t,
+    ordervals)
+
     netimpact = sum(ordervals, dims=1)' .* stocks.impact
     stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
+
     return stocks.value
 end
 
-function executeorder!(stocks, t, orders::Types.SellMarketOrder)
+function executeorder!(
+    stocks,
+    t,
+    orders::Types.SellMarketOrder)
+
     cashout = Array{Float64}(undef, 0, 2)
     oldstockvals = copy(stocks.value)
     stocks.value .= marketmake!(stocks, t, orders.values)
@@ -191,13 +279,18 @@ function executeorder!(stocks, t, orders::Types.SellMarketOrder)
         amount = -sum(orders.values[order, :] .* priceratio)
         cashout = vcat(cashout, [investor amount])
     end
+
     return stocks.value, cashout
 end
 
 # NOTE: Small issue here that sell orders happen first, so sellers get a bad
 # price, followed by buyers who get a good price, ~midmarket as their order
 # neutralises the prior decline. However, the amount they buy is also diminished
-function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
+function executeorder!(
+    stocks,
+    t,
+    orders::Types.BuyMarketOrder)
+
     mstocks = size(stocks.value, 1)
     sharesout = Array{Float64}(undef, 0, mstocks + 1)
     stocks.value .= marketmake!(stocks, t, orders.values)
@@ -206,11 +299,16 @@ function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
         shares = (orders.values[order, :] ./ stocks.value[:, t])'
         sharesout = vcat(sharesout, [fund shares])
     end
+
     return stocks.value, sharesout
 end
 
 # Disburse cash to investors following  sell order / divestment
-function disburse!(invassets, divestments, cashout)
+function disburse!(
+    invassets,
+    divestments,
+    cashout)
+
     for row in 1:size(divestments,1)
         inv = divestments[row, 1]
         fund = divestments[row, 2]
@@ -218,27 +316,45 @@ function disburse!(invassets, divestments, cashout)
         invassets[inv, fund] = 0
         invassets[inv, end] = cashout[row, 2]
     end
+
     return invassets
 end
 
 # Disburse shares to funds following buy order/investment, update value history
-function disburse!(funds::Types.EquityFund, sharesout, stockvals)
+function disburse!(
+    funds::Types.EquityFund,
+    sharesout,
+    stockvals)
+
     for row in 1:size(sharesout, 1)
         fund = convert(Int64, sharesout[row, 1])
         funds.holdings[fund, :] += sharesout[row, 2:end]
         funds.value[fund, :] .= vec(funds.holdings[fund, :]' * stockvals)
     end
+
     return funds
 end
 
-function fundrevalue!(funds, targets, stockvals)
+# Note that targets can be both range or list
+function fundrevalue!(
+    funds,
+    targets,
+    stockvals)
+
     for k in targets
         funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
     end
+
     return funds.value
 end
 
-function respawn!(funds, investors, t, stockvals, portfsizerange)
+function respawn!(
+    funds,
+    investors,
+    t,
+    stockvals,
+    portfsizerange=Params.portfsizerange)
+
     buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
     spawn = findall(vec(sum(funds.holdings, dims=2) .== 0))
@@ -253,20 +369,26 @@ function respawn!(funds, investors, t, stockvals, portfsizerange)
         investors.assets[inv, egg] = capital
         investors.assets[inv, end] = 0
         # Re-use fund holdings init fctn to draw new stocks and generate order
-        buyorder = (fundholdinit!(funds.holdings[egg, :]', portfsizerange,
-        capital, stockvals[:, t])' .* stockvals[:, t])'
+        buyorder = (fundholdinit!(funds.holdings[egg, :]', capital,
+        stockvals[:, t], portfsizerange)' .* stockvals[:, t])'
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, egg)
         # Set anchor investor's stake
         funds.stakes[egg, inv] = 1
     end
+
     return buyorders, investors.assets, funds.stakes
 end
 
 # NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
 # which reduces the flow-performance relationship, especially if many funds die
 
-function reinvest!(investors, funds, stockvals, t)
+function reinvest!(
+    investors,
+    funds,
+    stockvals,
+    t)
+
     kfunds = size(investors.assets,2) - 1
 
     buyorders = Types.BuyMarketOrder(
@@ -294,15 +416,22 @@ function reinvest!(investors, funds, stockvals, t)
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, choice)
     end
+
     return investors.assets, funds.stakes, buyorders
 end
 
-function bestperformer(fundvals, horizon, t)
+function bestperformer(
+    fundvals,
+    t,
+    perfwindow=Params.perfwindow)
+
+    horizon=perfwindow[end]
     # Return between investor's horizon and now/t
     horizonreturns =
     (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
     # Index of best-performing fund
     _, bestfund = findmax(horizonreturns)
+
     return bestfund
 end
 
