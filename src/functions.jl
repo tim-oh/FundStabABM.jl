@@ -66,10 +66,10 @@ end
 # Function for a discrete volatility range
 function stockvolinit!(
     stockvol,
-    volrange=Params.volrange,
+    volrange=Params.stockvolrange,
     bigm=Params.bigm)
 
-    stockvol = rand(volrange, bigm)
+    stockvol .= rand(volrange, bigm)
 
     return stockvol
 end
@@ -100,24 +100,24 @@ function stockimpactinit!(
 end
 
 function invhorizoninit!(
-    emptyvals,
+    horizons,
     perfwindow=Params.perfwindow)
-
-    horizons = rand(perfwindow, length(emptyvals))
+    horizons .= rand(perfwindow, length(horizons))
 
     return horizons
 end
 
 function invthreshinit!(
-    emptyvals,
+    thresholds,
     mean=Params.thresholdmean,
     std=Params.thresholdstd)
 
-    thresholds = randn(4) * std .+ mean
+    thresholds .= randn(length(thresholds)) * std .+ mean
 
     return thresholds
 end
 
+# TODO: Sort out the capital range to match other items, as in rand(range, n)
 function invassetinit!(
     invassets,
     caprange=Params.invcaprange,
@@ -139,16 +139,18 @@ function fundcapitalinit!(
     fundvals,
     investorassets)
 
-    fundvals[:,1] = sum(investorassets, dims=1)[1:end-1]
+    fundvals[:,1] .= sum(investorassets, dims=1)[1:end-1]
 
     return fundvals
 end
 
+# TODO: Test of this function didn't throw error when ncols was misspecified
+# as ncols=size(investorassets,1)- 1, i.e. wrong axis. Check why, write another
 function fundstakeinit!(
     fundstakes,
     investorassets)
 
-    ncols = size(investorassets, 1) - 1
+    ncols = size(investorassets, 2) - 1
     for col in 1:ncols
         fundstakes[col,:] = investorassets[:,col] ./ sum(investorassets[:,col])
     end
@@ -431,7 +433,7 @@ function bestperformer(
     (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
     # Index of best-performing fund
     _, bestfund = findmax(horizonreturns)
-    
+
     return bestfund
 end
 

@@ -25,6 +25,7 @@ using .Types, .Func, .Params
 # const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
 # const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency unit
 
+# Set up types
 market = Types.MarketIndex(
     zeros(Params.bigt))
 stocks = Types.Equity(
@@ -41,23 +42,22 @@ funds = Func.Types.EquityFund(
     zeros(Params.bigk, Params.bign),
     zeros(Params.bigk, Params.bigt))
 
-Func.marketinit!(market.value)#, mktstartval, perfwindow, drift, marketvol)
-println(market.value)
+# Initialise market and agents
+Func.marketinit!(market.value)
+Func.betainit!(stocks.beta)
+Func.stockvolinit!(stocks.vol)
+Func.stockvalueinit!(stocks, market.value)
+Func.stockimpactinit!(stocks.impact)
+Func.invhorizoninit!(investors.horizon)
+Func.invthreshinit!(investors.threshold)
+Func.invassetinit!(investors.assets)
+Func.fundcapitalinit!(funds.value, investors.assets)
+Func.fundstakeinit!(funds.stakes, investors.assets)
+Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value)
+Func.fundvalinit!(funds.value, funds.holdings, stocks.value)
+println(funds.holdings)
 
 for t in (Params.perfwindow[end]+2):Params.bigt
     Func.marketmove!(market.value, t)
+    Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
 end
-println(market.value)
-
-# marketinit!()
-# betainit!()
-# stockvolinit!()
-# stockvalueinit!()
-# stockimpactinit!()
-# invhorizoninit!()
-# invthreshinit!()
-# invassetinit!()
-# fundcapitalinit!()
-# fundstakeinit!()
-# fundholdinit!()
-# fundvalinit!()
