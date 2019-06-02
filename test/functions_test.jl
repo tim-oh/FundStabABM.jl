@@ -433,13 +433,25 @@ end # testset "Agent Behaviours"
 
     # Test: Revaluation of funds, can be needed after holdings or prices change
     # NOTE: Huge atol
+    funds = Func.Types.EquityFund(
+        zeros(bigk, bigm),
+        zeros(bigk, bign),
+        zeros(bigk, bigt))
+    funds.holdings .=
+    [0.0    0.0  0.0    3.18   0.0;
+    0.222  0.0  0.666  0.222  0.0;
+    0.0    0.0  0.0    0.0    0.0]
+    funds.value .=
+    [318.0   327.876   351.091   368.983  0.0  0.0;
+     1003.0  1137.52   1187.13   1233.15   0.0  0.0;
+     692.0   730.09    764.484   813.507  0.0  0.0]
     stocks.value .=
     [100.0  107.903  107.935   119.085   0.0  0.0;
      100.0   80.452   85.8176   86.4925  0.0  0.0;
      100.0  118.683  119.121   126.537   0.0  0.0;
      100.0  103.106  110.094   116.032   0.0  0.0;
      100.0  103.284  111.569   112.856   0.0  0.0]
-    @test fundrevalue!(funds, 1:bigk, stocks.value) ≈
+    @test Func.fundrevalue!(funds, 1:bigk, stocks.value) ≈
     [318.0   327.876   351.091   368.983  0.0  0.0;
     110.999999999999 125.886741903284 127.736985080927 136.469775818078 0.0 0.0;
      0.0  0.0  0.0  0.0  0.0  0.0] atol=1
