@@ -397,22 +397,22 @@ end # testset "Agent Behaviours"
 @testset "Price Functions" begin
 
     # Test: Random walk of market with drift
-    Random.seed!(4)
-    @test Func.marketmove(100, 0.05, 0.1) ==
-    100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4))
-
-    # Test: Draw of stock price moves on basis of marketmove
     market = Types.MarketIndex(vcat(
         mktstartval,
         zeros(bigt-1)))
+    Random.seed!(4)
+    @test Func.marketmove!(market.value, 2, 0.05, 0.1) ==
+    [100, 100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4)), 0, 0, 0, 0]
+
+    # Test: Draw of stock price moves on basis of marketmove
     market.value[2] = 102
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
         zeros(bigm))
-    @test Func.stockmove(
-    2, market.value, stocks.value[2], stocks.beta, stocks.vol)[1] ==
+    @test Func.stockmove!(
+    stocks.value, 2, market.value, stocks.beta, stocks.vol)[1] ==
     ((1 + ((market.value[2]-market.value[1])/market.value[1]) * stocks.beta[1])
      * stocks.value[1]) + stocks.vol[1] * randn(MersenneTwister(2000)) *
       stocks.value[1]

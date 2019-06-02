@@ -2,7 +2,8 @@ module Func
 using Random
 
 include("types.jl")
-import .Types
+include("params.jl")
+import .Types, .Params
 
 # NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
 
@@ -10,23 +11,43 @@ import .Types
 # that should probably inclucde input, output and purpose, plus comments on
 # assumptions or non-obvious points.
 
-function marketmove(currentval, drift, marketvol)
-    nextval = currentval*(1 + drift) + marketvol * randn()
-    return nextval
+function marketmove!(marketvals,
+    t::Int,
+    drift=Params.drift,
+    marketvol=Params.marketvol)
+
+    marketvals[t] = marketvals[t-1]*(1 + drift) + marketvol * randn()
+
+    return marketvals
 end
 
-function marketinit!(marketval, marketstartval, horizon, drift, marketvol)
-    marketval[1] = marketstartval
+function marketinit!(marketvals,
+    marketstartval=Params.marketstartval,
+    perfwindow=Params.perfwindow,
+    drift=Params.drift,
+    marketvol=Params.marketvol)
+
+    horizon = perfwindow[end]
+    marketvals[1] = marketstartval
     for t in 2:horizon+1
-        marketval[t] = Func.marketmove(marketval[t-1], drift, marketvol)
+        Func.marketmove!(marketvals, t, drift, marketvol)
     end
-    return marketval
+
+    return marketvals
 end
 
-function stockmove(t::Int, mktvals, currentvals, betas, stockvolas)
+function stockmove!(
+    stockvals,
+    t::Int,
+    mktvals,
+    betas,
+    stockvolas)
+
     mktreturn = (mktvals[t] - mktvals[t-1]) / mktvals[t-1]
-    nextvals = ((1 .+ mktreturn .* betas) .* currentvals) + stockvolas .* randn(length(stockvolas)) .* currentvals
-    return nextvals
+    stockvals[:, t] = ((1 .+ mktreturn .* betas) .* stockvals[:, t-1]) +
+        stockvolas .* randn(length(stockvolas)) .* stockvals[:, t-1]
+
+    return stockvals
 end
 
 function betainit!(betas, bigm, betastd, betamean)
@@ -44,8 +65,8 @@ function stockvalueinit!(
     stocks, stockstartval, horizon, marketval)
     stocks.value[:,1] .= stockstartval
     for t in 2:(horizon + 1)
-        stocks.value[:, t] = Func.stockmove(
-        t, marketval, stocks.value[:, t-1], stocks.beta, stocks.vol)
+        stocks.value .= Func.stockmove!(
+        stocks.value, t, marketval, stocks.beta, stocks.vol)
     end
     return stocks.value
 end
@@ -220,7 +241,7 @@ end
 function fundrevalue!(funds, targets, stockvals)
     for k in targets
         funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
-    end    
+    end
     return funds.value
 end
 
