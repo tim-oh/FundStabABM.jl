@@ -56,8 +56,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     Random.seed!(2)
     stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
     Random.seed!(3)
-    @test Func.stockvalueinit!(stocks, stockstartval, perfwindow[end],
-    market.value)[:,1:2] ≈
+    @test Func.stockvalueinit!(stocks, market.value, stockstartval,
+    perfwindow)[:,1:2] ≈
     hcat(ones(5,1) .* 100,
     [105.51989943374585, 105.64929533253186, 104.15928328717519,
      105.05203007235151, 103.79227677999667] +
@@ -134,7 +134,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: Generation of fund holdings
     Random.seed!(8)
     @test Func.fundholdinit!(
-    funds.holdings, portfsizerange, funds.value[:, 1], stocks.value[:, 1]) ≈
+    funds.holdings, funds.value[:, 1], stocks.value[:, 1], portfsizerange) ≈
     [0 0 0 318/100 0;
      1003/500 0 3009/500 1003/500 0;
      692/200 0 0 692/200 0]
@@ -171,7 +171,7 @@ end # testset "Initialisation Functions"
     Random.seed!(2)
     stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
     Random.seed!(3)
-    Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
+    Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)
     Random.seed!(4)
     Func.stockimpactinit!(stocks.impact, impactrange)
     investors = Types.RetailInvestor(
@@ -193,8 +193,8 @@ end # testset "Initialisation Functions"
     Func.fundcapitalinit!(funds.value, investors.assets)
     Func.fundstakeinit!(funds.stakes, investors.assets)
     Random.seed!(8)
-    Func.fundholdinit!(funds.holdings, portfsizerange, funds.value[:, 1],
-    stocks.value[:, 1])
+    Func.fundholdinit!(funds.holdings, funds.value[:, 1],
+    stocks.value[:, 1], portfsizerange)
     Func.fundvalinit!(
     funds.value, funds.holdings, stocks.value, perfwindow[end])
 
@@ -491,7 +491,7 @@ Random.seed!(2)
 stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
 
 Random.seed!(3)
-Func.stockvalueinit!(stocks, stockstartval, perfwindow[end], market.value)
+Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)
 
 Random.seed!(4)
 Func.stockimpactinit!(stocks.impact, impactrange)
@@ -521,8 +521,8 @@ Func.fundcapitalinit!(funds.value, investors.assets)
 Func.fundstakeinit!(funds.stakes, investors.assets)
 
 Random.seed!(8)
-Func.fundholdinit!(funds.holdings, portfsizerange, funds.value[:, 1],
-stocks.value[:, 1])
+Func.fundholdinit!(funds.holdings, funds.value[:, 1],
+stocks.value[:, 1], portfsizerange)
 
 Func.fundvalinit!(
 funds.value, funds.holdings, stocks.value, perfwindow[end])
