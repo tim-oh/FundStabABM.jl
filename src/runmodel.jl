@@ -4,26 +4,6 @@ include("../src/types.jl")
 include("../src/functions.jl")
 include("../src/params.jl")
 using .Types, .Func, .Params
-#
-# # Small parameter values for testing, same list as in /src/params.jl
-# const bigk = 3 # Number of funds, 3
-# const bign = 4 # Number of investors, 4
-# const bigm = 5 # Number of stocks, 5
-# const bigt = 6 # Number of time periods, 6
-# const mktstartval = 100 # Market index starting value, 100
-# const drift = 0.05 # Market index drift, 0.05
-# const marketvol = 0.1 # Market volatility (std?), 0.1
-# const perfwindow = 1:3 # Performance window range for investors (1:3)
-# const betamean = 1 # Average stock beta, 1
-# const betastd = 0.3 # Stock beta dispersion, 0.3
-# const stockstartval = 100 # Starting value of stocks
-# const stockvolrange = range(0.01, stop=0.1, step=0.01)
-# # Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
-# const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
-# const thresholdmean = 0 # Average investor return threshold for her fund
-# const thresholdstd = 0.05 # Standard deviation of investor return thresholds
-# const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
-# const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency unit
 
 # Set up types
 market = Types.MarketIndex(
@@ -42,6 +22,7 @@ funds = Func.Types.EquityFund(
     zeros(Params.bigk, Params.bign),
     zeros(Params.bigk, Params.bigt))
 
+# TODO: Think about how I should have tested the initialisation
 # Initialise market and agents
 Func.marketinit!(market.value)
 Func.betainit!(stocks.beta)
@@ -55,9 +36,63 @@ Func.fundcapitalinit!(funds.value, investors.assets)
 Func.fundstakeinit!(funds.stakes, investors.assets)
 Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value)
 Func.fundvalinit!(funds.value, funds.holdings, stocks.value)
-println(funds.holdings)
 
+# TODO: Think about how I should have tested the running cycle
+# TODO: Write functions that collect activity of a) selling out and b) buying in
+# TODO: Tests for cases with empty reviewers, divestments
+# QUESTION: Need 'if reviewers not empty'/'divestments not empty' branches?
+# Looping over time after the end of the  perfwindow[end]+1 initialisation phase
 for t in (Params.perfwindow[end]+2):Params.bigt
+
+    # Market index and assets move
     Func.marketmove!(market.value, t)
     Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
-end
+    Func.fundrevalue!(funds, stocks.value)
+
+    # QUESTION: Consider whether I should pass t instead of stocks.value[:, t]
+    # Investors (may_ sell out of underperforming funds
+    # TODO: Test sellorders.investors == cashout[1,:], similar for buyorders
+    # TODO: No cashout of value 0
+    # QUESTION: Enforce integers for fund/investor IDs in sellorders, cashout..?
+
+    # Investors' performance review
+    reviewers = Func.drawreviewers()
+    divestments = Func.perfreview(t, reviewers, investors, funds.value)
+
+    # Run liquidation/reinvestment cycle if there are divestments
+    if size(divestments,1) > 0
+
+        sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
+        stocks.value[:, t], divestments)
+
+        _, cashout = Func.executeorder!(stocks, t, sellorders)
+        Func.disburse!(investors.assets, divestments, cashout)
+
+        # TODO: Write test that check correct outocme of the whole process,
+        # step by step
+
+        # Generate a new fund for each dead one, if there are dead ones
+        if any(sum(funds.stakes, dims=2) .== 0)
+
+            buyorders, _, _ = Func.respawn!(funds, investors, t, stocks.value)
+
+            _, sharesout = Func.executeorder!(stocks, t, buyorders)
+
+            Func.disburse!(funds, sharesout, stocks.value)
+
+        end # respawn loop
+
+        # Re-value funds prior to reinvestment decisions
+        Func.fundrevalue!(funds, stocks.value)
+
+        # If there are still investors with spare cash, they reinvest it
+        if any(investors.assets[:, end] .> 0)
+
+            _, _, buyorders = Func.reinvest!(investors, funds, stocks.value, t)
+            _, sharesout = Func.executeorder!(stocks, t, buyorders)
+
+            Func.disburse!(funds, sharesout, stocks.value)
+        end # reinvestment loop
+
+    end # Divestment loop
+end # Model run

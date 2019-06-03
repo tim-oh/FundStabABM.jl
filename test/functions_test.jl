@@ -3,6 +3,8 @@ using Test, Random, LinearAlgebra
 include("../src/types.jl")
 using .Types
 
+# QUESTION: How do I run the type tests periodically?
+
 # Small parameter values for testing, same list as in /src/params.jl
 const bigk = 3 # Number of funds, 3
 const bign = 4 # Number of investors, 4
@@ -433,6 +435,7 @@ end # testset "Agent Behaviours"
 
     # Test: Revaluation of funds, can be needed after holdings or prices change
     # NOTE: Huge atol
+    # TODO: Test that it works for a single fund (and maybe a vector of funds)
     funds = Func.Types.EquityFund(
         zeros(bigk, bigm),
         zeros(bigk, bign),
@@ -451,7 +454,7 @@ end # testset "Agent Behaviours"
      100.0  118.683  119.121   126.537   0.0  0.0;
      100.0  103.106  110.094   116.032   0.0  0.0;
      100.0  103.284  111.569   112.856   0.0  0.0]
-    @test Func.fundrevalue!(funds, 1:bigk, stocks.value) ≈
+    @test Func.fundrevalue!(funds, stocks.value, 1:bigk) ≈
     [318.0   327.876   351.091   368.983  0.0  0.0;
     110.999999999999 125.886741903284 127.736985080927 136.469775818078 0.0 0.0;
      0.0  0.0  0.0  0.0  0.0  0.0] atol=1

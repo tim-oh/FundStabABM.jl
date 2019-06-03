@@ -215,7 +215,7 @@ function perfreview(
     divestments = Array{Int64}(undef, 0, 2)
     for rev in reviewers
         horizon = investors.horizon[rev]
-        fnds = findall(investors.assets[rev, :] .> 0)
+        fnds = findall(investors.assets[rev, 1:(end-1)] .> 0)
         for fnd in fnds
             valchange =
             (fundvals[fnd,t] - fundvals[fnd, t-horizon]) / fundvals[fnd,horizon]
@@ -227,6 +227,11 @@ function perfreview(
 
     return divestments
 end
+
+# TODO: Write test that checks that sellorders and buyorders have the same
+# number of rows in .values and .investors/.funds
+# QUESTION: Should I implement size and value checks for all intermediate outpts
+# NOTE: Passes one column of stock values only
 
 function liquidate!(
     holdings,
@@ -241,7 +246,7 @@ function liquidate!(
         fund = divestments[row, 2]
 
         # Note the minus
-        salevals = (holdings[fund, :] .* -stakes[fund, investor] .* stockvals)'
+        salevals = -stakes[fund, investor] .* (holdings[fund, :] .* stockvals)'
         sellorders.values = vcat(sellorders.values, salevals)
         sellorders.investors = vcat(sellorders.investors, investor)
 
@@ -306,6 +311,7 @@ function executeorder!(
     return stocks.value, sharesout
 end
 
+# QUESTION: Structure of disburse! methods is not symmetric in args... fix?
 # Disburse cash to investors following  sell order / divestment
 function disburse!(
     invassets,
@@ -333,7 +339,7 @@ function disburse!(
     for row in 1:size(sharesout, 1)
         fund = convert(Int64, sharesout[row, 1])
         funds.holdings[fund, :] += sharesout[row, 2:end]
-        funds.value[fund, :] .= vec(funds.holdings[fund, :]' * stockvals)
+        fundrevalue!(funds, stockvals, [fund])
     end
 
     return funds
@@ -341,8 +347,8 @@ end
 
 function fundrevalue!(
     funds,
-    targets,
-    stockvals)
+    stockvals,
+    targets=1:Params.bigk)
 
     for k in targets
         funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
@@ -368,7 +374,7 @@ function respawn!(
         inv = anchorinvs[idx]
         egg = spawn[idx]
         capital = investors.assets[inv, end]
-        # Anchor investor notes her investment in the fund
+        # Anchor investor notes investment in the fund
         investors.assets[inv, egg] = capital
         investors.assets[inv, end] = 0
         # Re-use fund holdings init fctn to draw new stocks and generate order
@@ -392,7 +398,7 @@ function reinvest!(
     stockvals,
     t)
 
-    kfunds = size(investors.assets,2) - 1
+    kfunds = size(investors.assets, 2) - 1
 
     buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
