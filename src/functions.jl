@@ -1,5 +1,5 @@
 module Func
-using Random
+using Random, Test
 
 include("types.jl")
 include("params.jl")
@@ -262,6 +262,7 @@ function liquidate!(
     return sellorders, holdings, stakes
 end
 
+# NOTE: Truncate minimum stock value at 0.0001
 function marketmake!(
     stocks,
     t,
@@ -269,6 +270,9 @@ function marketmake!(
 
     netimpact = sum(ordervals, dims=1)' .* stocks.impact
     stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
+
+    nearzeroidx = findall(stocks.value[:, t] .< 0.000000001)
+    stocks.value[nearzeroidx, t] .= 0.000000001
 
     return stocks.value
 end
@@ -443,5 +447,36 @@ function bestperformer(
     return bestfund
 end
 
+function initialise(market, stocks, investors, funds)
+    Func.marketinit!(market.value)
+    Func.betainit!(stocks.beta)
+    Func.stockvolinit!(stocks.vol)
+    Func.stockvalueinit!(stocks, market.value)
+    Func.stockimpactinit!(stocks.impact)
+    Func.invhorizoninit!(investors.horizon)
+    Func.invthreshinit!(investors.threshold)
+    Func.invassetinit!(investors.assets)
+    Func.fundcapitalinit!(funds.value, investors.assets)
+    Func.fundstakeinit!(funds.stakes, investors.assets)
+    Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value)
+    Func.fundvalinit!(funds.value, funds.holdings, stocks.value)
+end
+
+function boundstest(market, stocks, investors, funds)
+    @testset "Variable Bounds" begin
+
+        @test all(stocks.value .>= 0)
+        @test all(stocks.vol .>= 0)
+        @test all(stocks.impact .>= 0)
+
+        @test all(funds.holdings .>= 0)
+        @test all(funds.stakes .>= 0)
+        @test all(funds.value .>= 0)
+
+        @test all(investors.assets .>= 0)
+        @test all(investors.horizon .>= 0)
+        @test all(1 .>= investors.threshold .>= -1)
+    end
+end
 
 end  # module Functions

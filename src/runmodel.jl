@@ -22,20 +22,29 @@ funds = Func.Types.EquityFund(
     zeros(Params.bigk, Params.bign),
     zeros(Params.bigk, Params.bigt))
 
+@time Func.initialise(market, stocks, investors, funds)
+#Func.boundstest(market, stocks, investors, funds)
 # TODO: Think about how I should have tested the initialisation
-# Initialise market and agents
-Func.marketinit!(market.value)
-Func.betainit!(stocks.beta)
-Func.stockvolinit!(stocks.vol)
-Func.stockvalueinit!(stocks, market.value)
-Func.stockimpactinit!(stocks.impact)
-Func.invhorizoninit!(investors.horizon)
-Func.invthreshinit!(investors.threshold)
-Func.invassetinit!(investors.assets)
-Func.fundcapitalinit!(funds.value, investors.assets)
-Func.fundstakeinit!(funds.stakes, investors.assets)
-Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value)
-Func.fundvalinit!(funds.value, funds.holdings, stocks.value)
+# TODO: Set test=true flag for testing bounds and other such things
+#  or is that bad practice?
+
+#
+# @testset "Variable Bounds" begin
+#
+#     @test all(stocks.value .>= 0)
+#     @test all(stocks.vol .>= 0)
+#     @test all(stocks.beta .>= 0)
+#     @test all(stocks.impact .>= 0)
+#
+#     @test all(funds.holdings .>= 0)
+#     @test all(funds.stakes .>= 0)
+#     @test all(funds.value .>= 0)
+#
+#     @test all(investors.assets .>= 0)
+#     @test all(investors.horizon .>= 0)
+#     @test all(1 .>= investors.threshold .>= -1)
+#
+# end
 
 # TODO: Think about how I should have tested the running cycle
 # TODO: Write functions that collect activity of a) selling out and b) buying in
@@ -46,9 +55,12 @@ for t in (Params.perfwindow[end]+2):Params.bigt
 
     # Market index and assets move
     Func.marketmove!(market.value, t)
+    # Func.boundstest(market, stocks, investors, funds)
     Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
+    # Func.boundstest(market, stocks, investors, funds)
     Func.fundrevalue!(funds, stocks.value)
-
+    # Func.boundstest(market, stocks, investors, funds)
+    # print("Time: ", t)
     # QUESTION: Consider whether I should pass t instead of stocks.value[:, t]
     # Investors (may_ sell out of underperforming funds
     # TODO: Test sellorders.investors == cashout[1,:], similar for buyorders
@@ -96,3 +108,20 @@ for t in (Params.perfwindow[end]+2):Params.bigt
 
     end # Divestment loop
 end # Model run
+
+# @testset "Variable Bounds" begin
+#
+#     @test all(stocks.value .>= 0)
+#     @test all(stocks.vol .>= 0)
+#     @test all(stocks.beta .>= 0)
+#     @test all(stocks.impact .>= 0)
+#
+#     @test all(funds.holdings .>= 0)
+#     @test all(funds.stakes .>= 0)
+#     @test all(funds.value .>= 0)
+#
+#     @test all(investors.assets .>= 0)
+#     @test all(investors.horizon .>= 0)
+#     @test all(1 .>= investors.threshold .>= -1)
+#
+# end

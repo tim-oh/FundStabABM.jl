@@ -45,9 +45,9 @@ end
     @test size(stocks.vol) == (Params.bigm,)
     @test size(stocks.impact) == (Params.bigm,)
 
+    # NOTE: No test of stock.beta now
     @test all(stocks.value .>= 0)
     @test all(stocks.vol .>= 0)
-    @test all(stocks.beta .>= 0)
     @test all(stocks.impact .>= 0)
 end
 
