@@ -479,4 +479,79 @@ function boundstest(market, stocks, investors, funds)
     end
 end
 
+function modelrun(market, stocks, investors, funds)
+    for t in (Params.perfwindow[end]+2):Params.bigt
+
+        # Market index and assets move
+        Func.marketmove!(market.value, t)
+        # Func.boundstest(market, stocks, investors, funds)
+        Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
+        # Func.boundstest(market, stocks, investors, funds)
+        Func.fundrevalue!(funds, stocks.value)
+        # Func.boundstest(market, stocks, investors, funds)
+        # print("Time: ", t)
+        # QUESTION: Consider whether I should pass t instead of stocks.value[:, t]
+        # Investors (may_ sell out of underperforming funds
+        # TODO: Test sellorders.investors == cashout[1,:], similar for buyorders
+        # TODO: No cashout of value 0
+        # QUESTION: Enforce integers for fund/investor IDs in sellorders, cashout..?
+
+        # Investors' performance review
+        reviewers = Func.drawreviewers()
+        divestments = Func.perfreview(t, reviewers, investors, funds.value)
+
+        # Run liquidation/reinvestment cycle if there are divestments
+        if size(divestments,1) > 0
+
+            sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
+            stocks.value[:, t], divestments)
+
+            _, cashout = Func.executeorder!(stocks, t, sellorders)
+            Func.disburse!(investors.assets, divestments, cashout)
+
+            # TODO: Write test that check correct outocme of the whole process,
+            # step by step
+
+            # Generate a new fund for each dead one, if there are dead ones
+            if any(sum(funds.stakes, dims=2) .== 0)
+
+                buyorders, _, _ = Func.respawn!(funds, investors, t, stocks.value)
+
+                _, sharesout = Func.executeorder!(stocks, t, buyorders)
+
+                Func.disburse!(funds, sharesout, stocks.value)
+
+            end # respawn loop
+
+            # Re-value funds prior to reinvestment decisions
+            Func.fundrevalue!(funds, stocks.value)
+
+            # If there are still investors with spare cash, they reinvest it
+            if any(investors.assets[:, end] .> 0)
+
+                _, _, buyorders = Func.reinvest!(investors, funds, stocks.value, t)
+                _, sharesout = Func.executeorder!(stocks, t, buyorders)
+
+                Func.disburse!(funds, sharesout, stocks.value)
+            end # reinvestment loop
+
+        end # Divestment loop
+    end # Model run loop
+end # runmodel function
+
+function returns(vector)
+    returns = (vector[2:end] - vector[1:(end-1)]) ./ vector[1:(end-1)]
+    return returns
+end
+
+function returns(array)
+    nassets = size(array, 1) 
+    nperiods = size(array, 2)
+    returns = zeros(nassets, nperiods-1)
+    for asset in 1:nassets
+        returns[asset,:] =(array[asset,2:end]-array[1:(end-1)])/array[1:(end-1)]
+    end
+    return returns
+end
+
 end  # module Functions
