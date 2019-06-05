@@ -6,5 +6,4 @@ include("src/functions.jl")
 import .Params
 import .Func
 
-
 end # module
