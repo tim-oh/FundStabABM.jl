@@ -10,7 +10,7 @@ const bigk = 200 # Number of funds
 # Market parameters
 const marketstartval = 100 # Market index starting value
 const drift = 0.000307888 # Daily market index drift, 8%pa
-const marketvol = 1 # (1/250)^(1/2) Market volatility
+const marketvol = 1 # Market volatility
 
 # Stock parameters
 const betamean = 1 # Average stock beta
@@ -19,14 +19,14 @@ const stockstartval = 100 # Price of stocks at the beginning
 const stockvolrange = 0.001:0.001:0.01 # Range of stock volatilitiess
 
 # Investor parameters
-const perfwindow = 1:250 # Performance window for investor
+const perfwindow = 1:100 # Performance window for investor
 const invcaprange = (50,150) # Investors' range of initial capital
 const thresholdmean = 0 # Average investor return threshold for her fund
 const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 
 # Fund parameters
 const portfsizerange = 10:100 # Range of number of stocks in funds' portfolio
-const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency unit
+const impactrange = 0.0001:0.0001:0.001 # Stock price impact per currency unit
 
 # Stylised fact-check parameters
 # Number of lags?

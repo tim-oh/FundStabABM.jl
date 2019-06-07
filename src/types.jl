@@ -17,6 +17,7 @@ struct Equity <: Asset
     beta::Array{Float64} # Stocks' betas
     vol::Array{Float64} # Stocks' volatilities
     impact::Array{Float64} # Symmetric price impact for 1 money unit bought/sold
+    volume::Array{Float64} # Money value of the stock traded in a day
 end
 
 # NOTE: Mismatch between market value and what the index should be worth

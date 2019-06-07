@@ -31,7 +31,8 @@ end
         zeros(Params.bigm, Params.bigt),
         zeros(Params.bigm),
         zeros(Params.bigm),
-        zeros(Params.bigm))
+        zeros(Params.bigm),
+        zeros(Params.bigm, Params.bigt))
 
     @test isa(stocks, Types.Equity)
 
@@ -39,16 +40,19 @@ end
     @test typeof(stocks.vol) == Array{Float64, 1}
     @test typeof(stocks.beta) == Array{Float64, 1}
     @test typeof(stocks.impact) == Array{Float64, 1}
+    @test typeof(stocks.volume) == Array{Float64, 2}
 
     @test size(stocks.value) == (Params.bigm, Params.bigt)
     @test size(stocks.beta) == (Params.bigm,)
     @test size(stocks.vol) == (Params.bigm,)
     @test size(stocks.impact) == (Params.bigm,)
+    @test size(stocks.volume) == (Params.bigm, Params.bigt)
 
     # NOTE: No test of stock.beta now
     @test all(stocks.value .>= 0)
     @test all(stocks.vol .>= 0)
     @test all(stocks.impact .>= 0)
+    @test all(stocks.volume .>= 0)
 end
 
 @testset "Fund Type" begin

@@ -44,7 +44,8 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
-        zeros(bigm))
+        zeros(bigm),
+        zeros(bigm, bigt))
     Random.seed!(1)
     @test Func.betainit!(stocks.beta, bigm, betastd, betamean) ==
     1 .+ 0.3 .* randn(MersenneTwister(1), 5)
@@ -167,7 +168,8 @@ end # testset "Initialisation Functions"
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
-        zeros(bigm))
+        zeros(bigm),
+        zeros(bigm, bigt))
     Random.seed!(1)
     Func.betainit!(stocks.beta, bigm, betastd, betamean)
     Random.seed!(2)
@@ -412,7 +414,8 @@ end # testset "Agent Behaviours"
         zeros(bigm, bigt),
         zeros(bigm),
         zeros(bigm),
-        zeros(bigm))
+        zeros(bigm),
+        zeros(bigm, bigt))
     @test Func.stockmove!(
     stocks.value, 2, market.value, stocks.beta, stocks.vol)[1] ==
     ((1 + ((market.value[2]-market.value[1])/market.value[1]) * stocks.beta[1])
@@ -421,14 +424,14 @@ end # testset "Agent Behaviours"
 
     # Test: Market making / price impact function for buy order
     tmpstock =
-    Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
+    Types.Equity(hcat([100, 100],[101, 99],[102, 98]),[],[],[0.01, 0.05],[])
     tmpbuyordervals  = [20 0]
     @test Func.marketmake!(tmpstock, 3, tmpbuyordervals)[:,3] ==
     [122.39999999999999, 98.0]
 
     # Test: Market making / price impact function for sell order
     tmpstock =
-    Types.Equity(hcat([100, 100] , [101, 99], [102, 98]), [], [], [0.01, 0.05])
+    Types.Equity(hcat([100, 100],[101, 99],[102, 98]),[],[],[0.01, 0.05],[])
     tmpsellordervals = [-5 -5]
     @test Func.marketmake!(tmpstock, 3, tmpsellordervals)[:,3] ==
     [96.89999999999999, 73.5]
@@ -485,7 +488,8 @@ stocks = Types.Equity(
     zeros(bigm, bigt),
     zeros(bigm),
     zeros(bigm),
-    zeros(bigm))
+    zeros(bigm),
+    zeros(bigm, bigt))
 
 Random.seed!(1)
 Func.betainit!(stocks.beta, bigm, betastd, betamean)

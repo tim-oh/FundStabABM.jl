@@ -1,5 +1,5 @@
 module Func
-using Random, Test
+using Random, Test, StatsBase
 
 include("types.jl")
 include("params.jl")
@@ -263,6 +263,7 @@ function liquidate!(
 end
 
 # NOTE: Truncate minimum stock value at 0.0001
+# NOTE: Could move volume calculation into marketmake
 function marketmake!(
     stocks,
     t,
@@ -495,6 +496,7 @@ function modelrun(market, stocks, investors, funds)
         # TODO: Test sellorders.investors == cashout[1,:], similar for buyorders
         # TODO: No cashout of value 0
         # QUESTION: Enforce integers for fund/investor IDs in sellorders, cashout..?
+        # QUESTION: Is a separate trackvolume! function appropriate?
 
         # Investors' performance review
         reviewers = Func.drawreviewers()
@@ -506,6 +508,8 @@ function modelrun(market, stocks, investors, funds)
             sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
             stocks.value[:, t], divestments)
 
+            Func.trackvolume!(stocks.volume, sellorders, t)
+
             _, cashout = Func.executeorder!(stocks, t, sellorders)
             Func.disburse!(investors.assets, divestments, cashout)
 
@@ -516,6 +520,8 @@ function modelrun(market, stocks, investors, funds)
             if any(sum(funds.stakes, dims=2) .== 0)
 
                 buyorders, _, _ = Func.respawn!(funds, investors, t, stocks.value)
+
+                Func.trackvolume!(stocks.volume, sellorders, t)
 
                 _, sharesout = Func.executeorder!(stocks, t, buyorders)
 
@@ -530,6 +536,9 @@ function modelrun(market, stocks, investors, funds)
             if any(investors.assets[:, end] .> 0)
 
                 _, _, buyorders = Func.reinvest!(investors, funds, stocks.value, t)
+
+                Func.trackvolume!(stocks.volume, sellorders, t)
+
                 _, sharesout = Func.executeorder!(stocks, t, buyorders)
 
                 Func.disburse!(funds, sharesout, stocks.value)
@@ -539,19 +548,97 @@ function modelrun(market, stocks, investors, funds)
     end # Model run loop
 end # runmodel function
 
-function returns(vector)
-    returns = (vector[2:end] - vector[1:(end-1)]) ./ vector[1:(end-1)]
-    return returns
+
+# TODO: Write tests for both assetreturns functions and vecreturns
+# NOTE: Duplication in assetreturns and demean, i.e. targets for refactoring
+function vecreturns(vector::Array{Float64,1})
+    returnsvec = (vector[2:end] - vector[1:(end-1)]) ./ vector[1:(end-1)]
+    return returnsvec
 end
 
-function returns(array)
-    nassets = size(array, 1) 
-    nperiods = size(array, 2)
-    returns = zeros(nassets, nperiods-1)
-    for asset in 1:nassets
-        returns[asset,:] =(array[asset,2:end]-array[1:(end-1)])/array[1:(end-1)]
-    end
-    return returns
+function assetreturns(vector::Array{Float64,1})
+    returnsvec = vecreturns(vector)
+    return returnsvec
 end
+
+function assetreturns(array::Array{Float64,2})
+    nassets = size(array, 1)
+    nperiods = size(array, 2)
+    returnsarray = zeros(nassets, nperiods-1)
+    for asset in 1:nassets
+        returnsarray[asset,:] .= vecreturns(array[asset,:])
+    end
+    return returnsarray
+end
+
+function subtractmean(returns::Array{Float64,1})
+    demeaned = returns .- mean(returns)
+    return demeaned
+end
+
+# TODO: Test demean functions
+function demean(returns::Array{Float64,1})
+    demeanedreturns = subtractmean(returns)
+    return demeanedreturns
+end
+
+function demean(returns::Array{Float64,2})
+    nassets = size(returns, 1)
+    nperiods = size(returns, 2)
+    demeanedreturns = zeros(nassets, nperiods)
+    for asset in 1:nassets
+        demeanedreturns[asset, :] .= subtractmean(returns[asset, :])
+    end
+    return demeanedreturns
+end
+function calckurtoses(returns, startidx=Params.perfwindow[end]+1)
+    nassets = size(returns, 1)
+    kurtoses = zeros(nassets)
+    for asset in 1:nassets
+        kurtoses[asset] = kurtosis(returns[asset, startidx:end])
+    end
+    return kurtoses
+end
+
+
+# TODO: Test for trackvolume!
+# NOTE: Stylised facts should only be calculated for period after initialisation
+function trackvolume!(volume, order::Types.BuyMarketOrder, t)
+    volume[:, t] += sum(order.values, dims=1)'
+    return volume
+end
+
+function trackvolume!(volume, order::Types.SellMarketOrder, t)
+    volume[:, t] -= sum(order.values, dims=1)'
+    return volume
+end
+
+# TODO: Test for volavolumecorr
+function volavolumecorr(volumes, returns, startidx=Params.perfwindow[end]+1)
+    nassets = size(volumes, 1)
+    correlation = zeros(nassets)
+    for asset in 1:nassets
+        correlation[asset] =
+        StatsBase.cor(volumes[asset, (startidx+1):end],
+        broadcast(abs, returns[asset, startidx:end]))
+    end
+    return correlation
+end
+
+# TODO: Test for lossgainratio
+function lossgainratio(returns, cutoff, startidx=Params.perfwindow[end]+1)
+    nassets = size(returns, 1)
+    ratios = zeros(nassets)
+    for asset in 1:nassets
+        stock = returns[asset, startidx:end]
+        absolutevals = broadcast(abs, stock)
+        largeamount = percentile(absolutevals, cutoff)
+        upmoves = sum(stock .> largeamount)
+        downmoves = sum(stock .< -largeamount)
+        ratios[asset] = downmoves/upmoves
+    end
+    return ratios
+end
+
 
 end  # module Functions

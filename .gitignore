@@ -1,6 +1,7 @@
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+*.png
 tmp.jl
 tst.jl
 deps/deps.jl
