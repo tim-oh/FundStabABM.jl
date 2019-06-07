@@ -23,7 +23,7 @@ funds = Func.Types.EquityFund(
     zeros(Params.bigk, Params.bign),
     zeros(Params.bigk, Params.bigt))
 
-@time Func.initialise(market, stocks, investors, funds)
+Func.initialise(market, stocks, investors, funds)
 #Func.boundstest(market, stocks, investors, funds)
 # TODO: Think about how I should have tested the initialisation
 # TODO: Set test=true flag for testing bounds and other such things
@@ -54,7 +54,7 @@ funds = Func.Types.EquityFund(
 # QUESTION: Need 'if reviewers not empty'/'divestments not empty' branches?
 # Looping over time after the end of the  perfwindow[end]+1 initialisation phase
 
-@time Func.modelrun(market, stocks, investors, funds)
+Func.modelrun(market, stocks, investors, funds)
 
 @testset "Variable Bounds" begin
 
@@ -88,7 +88,7 @@ demeanedstockreturns = Func.demean(stockreturns)
 
 # Plotting a histogram overlaid with a normal distribution
 asset = demeanedmarketreturns
-StatsPlots.histogram(asset, bins=100, title="Example of stock returns vs normal distribution", label="Stock returns")
+StatsPlots.histogram(asset, bins=100, title="Market returns vs normal distribution", label="Market returns", legend=:topright)
 x = findmin(asset)[1]:0.001:findmax(asset)[1]
 d = fit(Normal, asset)
 StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
@@ -97,7 +97,7 @@ png("marketreturnsvsnormal")
 # Plotting a histogram overlaid with a normal distribution
 choice = 1
 asset = demeanedstockreturns[choice, :]
-StatsPlots.histogram(asset, bins=100, title="Example of stock returns", label="Random stock's returns", legend=:bottomright)
+StatsPlots.histogram(asset, bins=100, title="Example of stock returns", label="Random stock's returns", legend=:topright)
 x = findmin(asset)[1]:0.001:findmax(asset)[1]
 d = fit(Normal, asset)
 StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
@@ -134,7 +134,7 @@ png("kurtoses")
 cutoff = 5 # Percentile of absolute returns that determines 'large' return
 ratios = Func.lossgainratio(demeanedstockreturns, cutoff)
 plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
-plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(results), label="Mean ratio")
+plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
 png("lossgainratio")
 
 corrs = Func.volavolumecorr(stocks.volume, demeanedstockreturns)

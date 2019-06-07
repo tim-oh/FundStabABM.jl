@@ -401,7 +401,8 @@ function reinvest!(
     investors,
     funds,
     stockvals,
-    t)
+    t,
+    selection="best")
 
     kfunds = size(investors.assets, 2) - 1
 
@@ -411,8 +412,16 @@ function reinvest!(
     reinvestors = findall(vec(investors.assets[:, end] .> 0))
     for reinv in reinvestors
         injection = investors.assets[reinv, end]
-        # Choose best-performing fund
-        choice = bestperformer(funds.value, investors.horizon[reinv], t)
+        if selection == "best"
+            # Choose best-performing fund
+            choice = bestperformer(funds.value, investors.horizon[reinv], t)
+        elseif selection == "goodenough"
+            # Choose any fund above return threshold
+            choice = goodenoughfund(
+            funds.value, investors.horizon[reinv], investors.threshold[reinv],t)
+        else
+            println("Please specify a valid fund selection method in reinvest!")
+        end
         # Move cash into the fund
         investors.assets[reinv, choice] = injection
         investors.assets[reinv, end] = 0
@@ -446,6 +455,28 @@ function bestperformer(
     _, bestfund = findmax(horizonreturns)
 
     return bestfund
+end
+
+# TODO: Test for goodenoughfund function
+# NOTE: Choose best performer if no funds meet performance threshold
+function goodenoughfund(
+    fundvals,
+    horizon,
+    threshold,
+    t)
+
+    # Return between investor's horizon and now/t
+    horizonreturns =
+    (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
+    # Index of best-performing fund
+    candidates = findall(horizonreturns .> threshold)
+    if size(candidates,1) == 0
+        _, goodenough = findmax(horizonreturns)
+    else
+        goodenough = rand(1:size(fundvals,1))
+    end
+
+    return goodenough
 end
 
 function initialise(market, stocks, investors, funds)
@@ -535,7 +566,8 @@ function modelrun(market, stocks, investors, funds)
             # If there are still investors with spare cash, they reinvest it
             if any(investors.assets[:, end] .> 0)
 
-                _, _, buyorders = Func.reinvest!(investors, funds, stocks.value, t)
+                _, _, buyorders = Func.reinvest!(
+                investors, funds, stocks.value, t, "goodenough")
 
                 Func.trackvolume!(stocks.volume, sellorders, t)
 
