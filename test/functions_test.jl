@@ -1,4 +1,4 @@
-using Test, Random, LinearAlgebra
+using Test, Random, LinearAlgebra, Traceur
 
 include("../src/types.jl")
 using .Types
@@ -35,8 +35,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: generated market index history is non-negative
     Random.seed!(0)
     @test all(Func.marketinit!(market.value, mktstartval, perfwindow[end],
-    drift, marketvol)
-    .>= 0)
+     drift, marketvol) .>= 0)
     # TODO: Replace inequality with specific values, this one is in params_test
 
     # Test: generation of stock betas

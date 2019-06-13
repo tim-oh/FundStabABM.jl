@@ -1,5 +1,5 @@
 module Func
-using Random, Test, StatsBase
+using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
 
 include("types.jl")
 include("params.jl")
@@ -206,13 +206,14 @@ end
 # QUESTION: Is it sufficient to compare fund values or do we need to compare the
 # value of investors' stakes over time?
 
+# TODO: Test that only a single investors.asset is > 0
 function perfreview(
     t,
     reviewers,
     investors,
     fundvals)
 
-    divestments = Array{Int64}(undef, 0, 2)
+    divestments = zeros(Int64, 1,2)
     for rev in reviewers
         horizon = investors.horizon[rev]
         fnds = findall(investors.assets[rev, 1:(end-1)] .> 0)
@@ -220,7 +221,12 @@ function perfreview(
             valchange =
             (fundvals[fnd,t] - fundvals[fnd, t-horizon]) / fundvals[fnd,horizon]
             if valchange < investors.threshold[rev]
-                divestments = vcat(divestments, [rev fnd])
+                reviewerfundpair = [convert(Int64, rev) convert(Int64, fnd)]
+                if sum(divestments[1,:]) == 0
+                    divestments = reviewerfundpair
+                else
+                    divestments = [divestments; reviewerfundpair]
+                end
             end
         end
     end
@@ -262,7 +268,7 @@ function liquidate!(
     return sellorders, holdings, stakes
 end
 
-# NOTE: Truncate minimum stock value at 0.0001
+# NOTE: Truncate minimum stock value at 0.000000001
 # NOTE: Could move volume calculation into marketmake
 function marketmake!(
     stocks,
@@ -512,7 +518,7 @@ function boundstest(market, stocks, investors, funds)
 end
 
 function modelrun(market, stocks, investors, funds)
-    for t in (Params.perfwindow[end]+2):Params.bigt
+    @showprogress for t in (Params.perfwindow[end]+2):Params.bigt
 
         # Market index and assets move
         Func.marketmove!(market.value, t)
@@ -534,7 +540,7 @@ function modelrun(market, stocks, investors, funds)
         divestments = Func.perfreview(t, reviewers, investors, funds.value)
 
         # Run liquidation/reinvestment cycle if there are divestments
-        if size(divestments,1) > 0
+        if sum(divestments[1,:]) > 0
 
             sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
             stocks.value[:, t], divestments)
@@ -632,7 +638,6 @@ function calckurtoses(returns, startidx=Params.perfwindow[end]+1)
     return kurtoses
 end
 
-
 # TODO: Test for trackvolume!
 # NOTE: Stylised facts should only be calculated for period after initialisation
 function trackvolume!(volume, order::Types.BuyMarketOrder, t)
@@ -670,6 +675,121 @@ function lossgainratio(returns, cutoff, startidx=Params.perfwindow[end]+1)
         ratios[asset] = downmoves/upmoves
     end
     return ratios
+end
+
+# TODO: move plots to separate file
+# TODO: save plots in plots file
+
+function plot_stylisedfacts(
+    marketval, stocksval, stocksvolume, returnspctile=5)
+    marketreturns = Func.assetreturns(marketval)
+    stockreturns = Func.assetreturns(stocksval)
+    demeanedmarketreturns = Func.demean(marketreturns)
+    demeanedstockreturns = Func.demean(stockreturns)
+    demeanedmarketreturnssquared = demeanedmarketreturns.^2
+    demeanedstockreturnssquared = demeanedstockreturns.^2
+    lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
+    choice = rand(1:size(stockreturns,1))
+    pyplot() # as GR wasn't working, maybe fix that
+    plot_pricehistories(stocksval, marketval)
+    plot_marketreturnhistogram(demeanedmarketreturns)
+    plot_stockreturnhistogram(demeanedstockreturns, choice)
+    plot_marketpacf(demeanedmarketreturns, lags)
+    plot_stockpacf(demeanedstockreturns, choice, lags)
+    plot_marketvolaclustering(demeanedmarketreturnssquared, lags)
+    plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags)
+    plot_stockkurtoses(demeanedstockreturns)
+    plot_lossgainratio(demeanedstockreturns, returnspctile)
+    plot_volavolumecorr(stocksvolume, demeanedstockreturns)
+end
+
+# TODO: refactor plots - DRY
+function plot_pricehistories(stocksval, marketval)
+    periods = 1:length(marketval)
+    nstocks = 1:100
+    StatsPlots.plot(periods, transpose(stocksval)[:, nstocks], legend=:none,
+    title="History of stock returns")
+    plt = StatsPlots.plot!(
+        periods, marketval, lw=3, lc=:black, label="Market index")
+    png("returnshistory")
+    display(plt)
+end
+
+function plot_marketreturnhistogram(asset)
+    StatsPlots.histogram(asset, bins=100, title="Market returns vs normal distribution", label="Market returns", legend=:topright)
+    x = findmin(asset)[1]:0.001:findmax(asset)[1]
+    d = fit(Normal, asset)
+    plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
+    png("marketreturnsvsnormal")
+    display(plt)
+end
+
+function plot_stockreturnhistogram(demeanedstockreturns, choice)
+    asset = demeanedstockreturns[choice, :]
+    StatsPlots.histogram(asset, bins=100, title="Example of stock returns", label="Random stock's returns", legend=:topright)
+    x = findmin(asset)[1]:0.001:findmax(asset)[1]
+    d = fit(Normal, asset)
+    plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
+    png("stockreturnsvsnormal")
+    display(plt)
+end
+
+function plot_marketpacf(demeanedmarketreturns, lags)
+    asset = demeanedmarketreturns
+    pacfcoeffs = pacf(demeanedmarketreturns, lags)
+    StatsPlots.bar(pacfcoeffs, title="Market autocorrelation", label="Partial correlation coefficients")
+    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="critical values", legend=:bottomright)
+    png("marketautocorrelation")
+    display(plt)
+end
+
+function plot_stockpacf(demeanedstockreturns, choice, lags)
+    asset = demeanedstockreturns[choice,: ]
+    pacfcoeffs = pacf(asset, lags)
+    StatsPlots.bar(pacfcoeffs, title="Stock autocorrelation (random stock example)", label="Partial autocorrelation coefficients, demeaned returns", legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
+    png("stockautocorrelation")
+    display(plt)
+end
+
+function plot_marketvolaclustering(demeanedmarketreturnssquared, lags)
+    asset = demeanedmarketreturnssquared
+    pacfcoeffs = pacf(asset, lags)
+    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, market", label="Partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
+    png("marketvolaclustering")
+    display(plt)
+end
+
+function plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags)
+    asset = demeanedstockreturnssquared[choice,:]
+    pacfcoeffs = pacf(asset, lags)
+    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock", label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
+    png("stockvolaclustering")
+    display(plt)
+end
+
+function plot_stockkurtoses(demeanedstockreturns)
+    stockkurtoses = Func.calckurtoses(demeanedstockreturns)
+    plt = StatsPlots.bar(sort!(stockkurtoses, rev=true), title="Kurtoses of stock returns", label="Kurtoses")
+    png("kurtoses")
+    display(plt)
+end
+
+function plot_lossgainratio(demeanedstockreturns, returnspercentile)
+    ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile)
+    plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
+    plt = plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
+    png("lossgainratio")
+    display(plt)
+end
+
+function plot_volavolumecorr(volume, demeanedstockreturns)
+    corrs = Func.volavolumecorr(volume, demeanedstockreturns)
+    plt = bar(sort(corrs, rev=true), title="Volume-volatility correlation of stocks", label="Volume - absolute return correlation coefficients")
+    png("volavolumecorr")
+    display(plt)
 end
 
 

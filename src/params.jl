@@ -4,7 +4,7 @@ using Random
 # Agent and object numbers, length of time
 const bigm = 200 # Number of stocks
 const bign = 500 # Number of investors
-const bigt = 1000 # Number of time periods
+const bigt = 300 # Number of time periods
 const bigk = 200 # Number of funds
 
 # Market parameters
