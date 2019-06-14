@@ -1,5 +1,5 @@
-using Test
-using FundStabABM
+using Test, FundStabABM, Random, StatsBase, StatsPlots, Distributions
+using ProgressMeter
 
 @testset "All tests" begin
     include("./types_test.jl")
