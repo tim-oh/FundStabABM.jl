@@ -1,4 +1,5 @@
 using Test
+using FundStabABM
 
 @testset "All tests" begin
     include("test/types_test.jl")
