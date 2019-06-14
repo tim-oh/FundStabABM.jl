@@ -29,6 +29,8 @@ const thresholdstd = 0.05 # Standard deviation of investor return thresholds
 const portfsizerange = 10:100 # Range of number of stocks in funds' portfolio
 const impactrange = 0.0001:0.0001:0.001 # Stock price impact per currency unit
 
+const plotpath = "./plots/"
+
 # Stylised fact-check parameters
 # Number of lags?
 # Size of confidence interval?

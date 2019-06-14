@@ -712,7 +712,7 @@ function plot_pricehistories(stocksval, marketval)
     title="History of stock returns")
     plt = StatsPlots.plot!(
         periods, marketval, lw=3, lc=:black, label="Market index")
-    png("returnshistory")
+    png(joinpath(Params.plotpath, "returnshistory"))
     display(plt)
 end
 
@@ -721,7 +721,7 @@ function plot_marketreturnhistogram(asset)
     x = findmin(asset)[1]:0.001:findmax(asset)[1]
     d = fit(Normal, asset)
     plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
-    png("marketreturnsvsnormal")
+    png(joinpath(Params.plotpath, "marketreturnsvsnormal"))
     display(plt)
 end
 
@@ -731,7 +731,7 @@ function plot_stockreturnhistogram(demeanedstockreturns, choice)
     x = findmin(asset)[1]:0.001:findmax(asset)[1]
     d = fit(Normal, asset)
     plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
-    png("stockreturnsvsnormal")
+    png(joinpath(Params.plotpath, "stockreturnsvsnormal"))
     display(plt)
 end
 
@@ -740,7 +740,7 @@ function plot_marketpacf(demeanedmarketreturns, lags)
     pacfcoeffs = pacf(demeanedmarketreturns, lags)
     StatsPlots.bar(pacfcoeffs, title="Market autocorrelation", label="Partial correlation coefficients")
     plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="critical values", legend=:bottomright)
-    png("marketautocorrelation")
+    png(joinpath(Params.plotpath, "marketautocorrelation"))
     display(plt)
 end
 
@@ -749,7 +749,7 @@ function plot_stockpacf(demeanedstockreturns, choice, lags)
     pacfcoeffs = pacf(asset, lags)
     StatsPlots.bar(pacfcoeffs, title="Stock autocorrelation (random stock example)", label="Partial autocorrelation coefficients, demeaned returns", legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png("stockautocorrelation")
+    png(joinpath(Params.plotpath, "stockautocorrelation"))
     display(plt)
 end
 
@@ -758,7 +758,7 @@ function plot_marketvolaclustering(demeanedmarketreturnssquared, lags)
     pacfcoeffs = pacf(asset, lags)
     StatsPlots.bar(pacfcoeffs, title="Volatility clustering, market", label="Partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png("marketvolaclustering")
+    png(joinpath(Params.plotpath, "marketvolaclustering"))
     display(plt)
 end
 
@@ -767,14 +767,14 @@ function plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags)
     pacfcoeffs = pacf(asset, lags)
     StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock", label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png("stockvolaclustering")
+    png(joinpath(Params.plotpath, "stockvolaclustering"))
     display(plt)
 end
 
 function plot_stockkurtoses(demeanedstockreturns)
     stockkurtoses = Func.calckurtoses(demeanedstockreturns)
     plt = StatsPlots.bar(sort!(stockkurtoses, rev=true), title="Kurtoses of stock returns", label="Kurtoses")
-    png("kurtoses")
+    png(joinpath(Params.plotpath, "kurtoses"))
     display(plt)
 end
 
@@ -782,14 +782,14 @@ function plot_lossgainratio(demeanedstockreturns, returnspercentile)
     ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile)
     plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
     plt = plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
-    png("lossgainratio")
+    png(joinpath(Params.plotpath, "lossgainratio"))
     display(plt)
 end
 
 function plot_volavolumecorr(volume, demeanedstockreturns)
     corrs = Func.volavolumecorr(volume, demeanedstockreturns)
     plt = bar(sort(corrs, rev=true), title="Volume-volatility correlation of stocks", label="Volume - absolute return correlation coefficients")
-    png("volavolumecorr")
+    png(joinpath(Params.plotpath, "volavolumecorr"))
     display(plt)
 end
 

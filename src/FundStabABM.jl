@@ -1,5 +1,5 @@
 module FundStabABM
 
-greet() = print("Hello World!")
+runmodel() = include("./src/runmodel.jl")
 
-end # module
+end
