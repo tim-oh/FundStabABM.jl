@@ -196,9 +196,10 @@ function fundvalinit!(
 end
 
 function drawreviewers(
-    bign=Params.bign)
+    bign=Params.bign,
+    reviewprob=Params.reviewprobability)
 
-    reviewers = rand(bign) .< 1/63 # On average, a fund reviews once a quarter
+    reviewers = rand(bign) .< reviewprob
 
     return findall(reviewers)
 end

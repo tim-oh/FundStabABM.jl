@@ -38,4 +38,4 @@ Func.initialise(market, stocks, investors, funds)
 
 Func.modelrun(market, stocks, investors, funds)
 Func.boundstest(market, stocks, investors, funds)
-Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)
+#Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)

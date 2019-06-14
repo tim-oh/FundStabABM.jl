@@ -19,6 +19,7 @@ const stockstartval = 100 # Price of stocks at the beginning
 const stockvolrange = 0.001:0.001:0.01 # Range of stock volatilitiess
 
 # Investor parameters
+const reviewprobability = 1/63 # Daily likelihood of performance review
 const perfwindow = 1:100 # Performance window for investor
 const invcaprange = (50,150) # Investors' range of initial capital
 const thresholdmean = 0 # Average investor return threshold for her fund
