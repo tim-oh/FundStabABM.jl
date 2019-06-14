@@ -1,11 +1,8 @@
-using Test, Random
-include("../src/types.jl")
-include("../src/params.jl")
-include("../src/functions.jl")
+using Random
 
-using .Types
-using .Params
-using .Func
+using FundStabABM.Types
+using FundStabABM.Params
+using FundStabABM.Func
 
 
 @testset "Market Type" begin

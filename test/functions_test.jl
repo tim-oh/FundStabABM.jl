@@ -1,7 +1,6 @@
 using Test, Random, LinearAlgebra, Traceur
 
-include("../src/types.jl")
-using .Types
+using FundStabABM.Func, FundStabABM.Types
 
 # QUESTION: How do I run the type tests periodically?
 
