@@ -399,9 +399,7 @@ end # testset "Agent Behaviours"
 @testset "Price Functions" begin
 
     # Test: Random walk of market with drift
-    market = Types.MarketIndex(vcat(
-        mktstartval,
-        zeros(bigt-1)))
+    market = Types.MarketIndex([mktstartval; zeros(bigt-1)])
     Random.seed!(4)
     @test Func.marketmove!(market.value, 2, 0.05, 0.1) ==
     [100, 100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4)), 0, 0, 0, 0]
@@ -422,14 +420,14 @@ end # testset "Agent Behaviours"
 
     # Test: Market making / price impact function for buy order
     tmpstock =
-    Types.Equity(hcat([100, 100],[101, 99],[102, 98]),[],[],[0.01, 0.05],[])
+    Types.Equity([[100, 100] [101, 99] [102, 98]], [], [], [0.01, 0.05], [0 0])
     tmpbuyordervals  = [20 0]
     @test Func.marketmake!(tmpstock, 3, tmpbuyordervals)[:,3] ==
     [122.39999999999999, 98.0]
 
     # Test: Market making / price impact function for sell order
     tmpstock =
-    Types.Equity(hcat([100, 100],[101, 99],[102, 98]),[],[],[0.01, 0.05],[])
+    Types.Equity([[100, 100] [101, 99] [102, 98]],[],[],[0.01, 0.05],[0 0])
     tmpsellordervals = [-5 -5]
     @test Func.marketmake!(tmpstock, 3, tmpsellordervals)[:,3] ==
     [96.89999999999999, 73.5]
@@ -461,14 +459,14 @@ end # testset "Agent Behaviours"
      0.0  0.0  0.0  0.0  0.0  0.0] atol=1
 end # testset "Price Functions"
 
-@testset "Integration Tests" begin
+# @testset "Integration Tests" begin
 
     # TODO: funds initialisation integration tests
     # TODO: market initialisation integration tests
     # TODO: stocks initialisation integration tests
     # TODO: investors initialisation integration tests
     # TODO: other integration tests
-end # testset "Integration Tests"
+# end # testset "Integration Tests"
 
 
 

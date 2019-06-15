@@ -36,6 +36,6 @@ function runmodel()
     # Looping over time after the end of the  perfwindow[end]+1 initialisation phase
 
     Func.modelrun(market, stocks, investors, funds)
-    Func.boundstest(market, stocks, investors, funds)
+    #Func.boundstest(market, stocks, investors, funds)
     #Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)
 end
