@@ -1,5 +1,4 @@
-include("../src/params.jl")
-using Test, .Params
+using FundStabABM.Params
 
 @testset "Parameters" begin
     @test Params.bign >= Params.bigk >= 1 # No fewer investors than funds

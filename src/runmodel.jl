@@ -1,8 +1,5 @@
 using Test, Random, LinearAlgebra, StatsBase, StatsPlots, Distributions, Traceur
 
-include("../src/types.jl")
-include("../src/functions.jl")
-include("../src/params.jl")
 using .Types, .Func, .Params
 
 function runmodel()
@@ -42,4 +39,3 @@ function runmodel()
     Func.boundstest(market, stocks, investors, funds)
     #Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)
 end
-runmodel()
