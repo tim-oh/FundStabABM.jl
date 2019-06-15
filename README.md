@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/tim-oh/FundStabABM.jl.svg?branch=master)](https://travis-ci.org/tim-oh/FundStabABM.jl)
+
 # FundStabABM.jl
 
 An agent-based simulation model for financial stability analysis of investment funds.
