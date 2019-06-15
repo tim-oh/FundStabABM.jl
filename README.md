@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/tim-oh/FundStabABM.jl.svg?branch=master)](https://travis-ci.org/tim-oh/FundStabABM.jl)
+[![codecov](https://codecov.io/gh/tim-oh/FundStabABM.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/tim-oh/FundStabABM.jl)
 
 # FundStabABM.jl
 
