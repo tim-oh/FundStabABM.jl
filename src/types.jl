@@ -28,9 +28,9 @@ struct MarketIndex <: Asset
 end
 
 struct RetailInvestor <: Investor
-    assets::Array{Float64} # N possible stakes in M funds and (1) cash
-    horizon::Array{Int64} # Positive integer, draw from range, can use rand(S)
-    threshold::Array{Float64} # ~N(0, 5)
+    assets::Matrix{Float64} # N possible stakes in M funds and (1) cash
+    horizon::Vector{Int64} # Positive integer, draw from range, can use rand(S)
+    threshold::Vector{Float64} # ~N(0, 5)
 end
 
 struct EquityFund <: AssetManager
