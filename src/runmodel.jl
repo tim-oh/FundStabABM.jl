@@ -2,7 +2,7 @@ using Test, Random, LinearAlgebra, StatsBase, StatsPlots, Distributions, Traceur
 
 using .Types, .Func, .Params
 
-function runmodel()
+function runmodel(fundselector="probabilistic")
 
     # Set up types
     market = Types.MarketIndex(
@@ -24,8 +24,8 @@ function runmodel()
 
     Func.initialise(market, stocks, investors, funds)
     #Func.boundstest(market, stocks, investors, funds)
-    Func.modelrun(market, stocks, investors, funds)
-    Func.boundstest(market, stocks, investors, funds)
+    Func.modelrun(market, stocks, investors, funds, fundselector)
+    # Func.boundstest(market, stocks, investors, funds)
     Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)
 end
 

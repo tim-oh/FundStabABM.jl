@@ -5,11 +5,7 @@ include("types.jl")
 include("params.jl")
 import .Types, .Params
 
-# NOTE Used to have default parameters: drift=Params.drift, marketvol=Params.marketvol. Consider these for the functions in general, so that function arguments are minimal outside of testing.
-
-# TODO: Add description to each function, according to some standard format
-# that should probably inclucde input, output and purpose, plus comments on
-# assumptions or non-obvious points.
+# TODO: Write docstrings to be used with Documenter.jl.
 
 function marketmove!(
     marketvals,
@@ -429,6 +425,8 @@ function reinvest!(
             choice = goodenoughfund(horizonreturns, investors.threshold[reinv])
         elseif selection == "probabilistic"
             choice = probabilisticchoice(horizonreturns)
+        elseif selection == "random"
+            choice = randomchoice(horizonreturns)
         else
             println("Please specify a valid fund selection method in reinvest!")
         end
@@ -504,6 +502,13 @@ function probabilisticchoice(
     return fundchoice
 end
 
+function randomchoice(horizonreturns)
+
+    fundchoice = rand(1:length(horizonreturns))
+
+    return fundchoice
+end
+
 function initialise(market, stocks, investors, funds)
     Func.marketinit!(market.value)
     Func.betainit!(stocks.beta)
@@ -536,7 +541,7 @@ function boundstest(market, stocks, investors, funds)
     end
 end
 
-function modelrun(market, stocks, investors, funds)
+function modelrun(market, stocks, investors, funds,fundselector="bestperformer")
     @showprogress for t in (Params.perfwindow[end]+2):Params.bigt
 
         # Market index and assets move
@@ -592,7 +597,7 @@ function modelrun(market, stocks, investors, funds)
             if any(investors.assets[:, end] .> 0)
 
                 _, _, buyorders = Func.reinvest!(
-                investors, funds, stocks.value, t, "probabilistic")
+                investors, funds, stocks.value, t, fundselector)
 
                 Func.trackvolume!(stocks.volume, sellorders, t)
 
@@ -709,7 +714,7 @@ function plot_stylisedfacts(
     demeanedstockreturnssquared = demeanedstockreturns.^2
     lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
     choice = rand(1:size(stockreturns,1))
-    pyplot() # as GR wasn't working, maybe fix that
+    #pyplot() # as GR wasn't working, maybe fix that
     plot_pricehistories(stocksval, marketval)
     plot_marketreturnhistogram(demeanedmarketreturns)
     plot_stockreturnhistogram(demeanedstockreturns, choice)
@@ -727,7 +732,7 @@ function plot_pricehistories(stocksval, marketval)
     periods = 1:length(marketval)
     nstocks = 1:100
     StatsPlots.plot(periods, transpose(stocksval)[:, nstocks], legend=:none,
-    title="History of stock returns")
+    title="Asset prices history (market in black)")
     plt = StatsPlots.plot!(
         periods, marketval, lw=3, lc=:black, label="Market index")
     png(joinpath(Params.plotpath, "returnshistory"))
