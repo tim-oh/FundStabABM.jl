@@ -354,15 +354,16 @@ end # testset "Initialisation Functions"
      1003.0 1137.5171362972462 1187.1302928457408 1233.1458121219132 0.0 0.0;
      673.1466804 726.844707282 746.434998099 802.677606280 0.0 0.0] atol=0.001
 
+    # TODO: Test horizonreturnscalc and fund selection methods separately
     # Test: Return index of best-performing fund for min and max time horizon
-    fundvals =
-    [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
-     1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
-     673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
-    horizonmin = perfwindow[1]
-    horizonmax = perfwindow[end]
-    @test Func.bestperformer(fundvals, horizonmin, 4) == 3
-    @test Func.bestperformer(fundvals, horizonmax, 4) == 2
+    # fundvals =
+    # [318.0 327.876 351.091 368.98315314801744 0.0 0.0;
+    #  1003.0 1137.52 1187.13 1233.1458121219132 0.0 0.0;
+    #  673.1466804378 726.844707282640 746.434998099860 802.677606280818 0.0 0.0]
+    # horizonmin = perfwindow[1]
+    # horizonmax = perfwindow[end]
+    # @test Func.bestperformer(fundvals, horizonmin, 4) == 3
+    # @test Func.bestperformer(fundvals, horizonmax, 4) == 2
 
     # Test: Reallocation of spare investor cash to a fund
     # NOTE: investors.assets don't update automatically, tracks initial investmt

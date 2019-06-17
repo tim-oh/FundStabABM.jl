@@ -419,13 +419,16 @@ function reinvest!(
     reinvestors = findall(vec(investors.assets[:, end] .> 0))
     for reinv in reinvestors
         injection = investors.assets[reinv, end]
+        horizonreturns = horizonreturncalc(funds.value,
+            investors.horizon[reinv], t)
         if selection == "best"
             # Choose best-performing fund
-            choice = bestperformer(funds.value, investors.horizon[reinv], t)
+            choice = bestperformer(horizonreturns)
         elseif selection == "goodenough"
             # Choose any fund above return threshold
-            choice = goodenoughfund(
-            funds.value, investors.horizon[reinv], investors.threshold[reinv],t)
+            choice = goodenoughfund(horizonreturns, investors.threshold[reinv])
+        elseif selection == "probabilistic"
+            choice = probabilisticchoice(horizonreturns)
         else
             println("Please specify a valid fund selection method in reinvest!")
         end
@@ -450,40 +453,55 @@ function reinvest!(
     return investors.assets, funds.stakes, buyorders
 end
 
-function bestperformer(
+function horizonreturncalc(
     fundvals,
     horizon,
     t)
 
-    # Return between investor's horizon and now/t
     horizonreturns =
-    (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
-    # Index of best-performing fund
+        (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
+
+    return horizonreturns
+end
+
+function bestperformer(horizonreturns)
+
     _, bestfund = findmax(horizonreturns)
 
     return bestfund
 end
 
 # TODO: Test for goodenoughfund function
-# NOTE: Choose best performer if no funds meet performance threshold
 function goodenoughfund(
-    fundvals,
-    horizon,
-    threshold,
-    t)
+    horizonreturns,
+    threshold)
 
-    # Return between investor's horizon and now/t
-    horizonreturns =
-    (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
-    # Index of best-performing fund
     candidates = findall(horizonreturns .> threshold)
-    if size(candidates,1) == 0
+    if size(candidates,1) == 0 # Choose best if none meet threshold
         _, goodenough = findmax(horizonreturns)
-    else
-        goodenough = rand(1:size(fundvals,1))
+    else # Otherwise choose one at random from those that meet threshold
+        goodenough = rand(candidates)
     end
 
     return goodenough
+end
+
+# NOTE: Could rationalise many in-loop operations by computation outside and
+# passing as an argument
+# TODO: Write a test for this function
+function probabilisticchoice(
+    horizonreturns)
+
+    probability = similar(horizonreturns)
+    indices = 1:length(horizonreturns)
+    normaliser = sum(indices)
+    returnrankorder = sortperm(horizonreturns) # Return indices, ascending order
+    probability[returnrankorder] = collect(indices) / normaliser
+    @assert sum(probability) ≈ 1
+    distn = Categorical(probability)
+    fundchoice = rand(distn)
+
+    return fundchoice
 end
 
 function initialise(market, stocks, investors, funds)
@@ -574,7 +592,7 @@ function modelrun(market, stocks, investors, funds)
             if any(investors.assets[:, end] .> 0)
 
                 _, _, buyorders = Func.reinvest!(
-                investors, funds, stocks.value, t, "goodenough")
+                investors, funds, stocks.value, t, "probabilistic")
 
                 Func.trackvolume!(stocks.volume, sellorders, t)
 
