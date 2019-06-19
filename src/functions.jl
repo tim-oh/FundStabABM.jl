@@ -1,5 +1,6 @@
 module Func
 using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
+using Base.Iterators, PyPlot
 
 include("types.jl")
 include("params.jl")
@@ -714,7 +715,7 @@ function plot_stylisedfacts(
     demeanedstockreturnssquared = demeanedstockreturns.^2
     lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
     choice = rand(1:size(stockreturns,1))
-    #pyplot() # as GR wasn't working, maybe fix that
+    pyplot() # as GR wasn't working, maybe fix that
     plot_pricehistories(stocksval, marketval)
     plot_marketreturnhistogram(demeanedmarketreturns)
     plot_stockreturnhistogram(demeanedstockreturns, choice)
@@ -725,6 +726,7 @@ function plot_stylisedfacts(
     plot_stockkurtoses(demeanedstockreturns)
     plot_lossgainratio(demeanedstockreturns, returnspctile)
     plot_volavolumecorr(stocksvolume, demeanedstockreturns)
+    plot_logprobs(demeanedstockreturns)
 end
 
 # TODO: refactor plots - DRY
@@ -803,18 +805,33 @@ end
 
 function plot_lossgainratio(demeanedstockreturns, returnspercentile)
     ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile)
-    plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
-    plt = plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
+    StatsPlots.plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
+    plt = StatsPlots.plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
     png(joinpath(Params.plotpath, "lossgainratio"))
     display(plt)
 end
 
 function plot_volavolumecorr(volume, demeanedstockreturns)
     corrs = Func.volavolumecorr(volume, demeanedstockreturns)
-    plt = bar(sort(corrs, rev=true), title="Volume-volatility correlation of stocks", label="Volume - absolute return correlation coefficients")
+    plt = StatsPlots.bar(sort(corrs, rev=true), title="Volume-volatility correlation of stocks", label="Volume - absolute return correlation coefficients")
     png(joinpath(Params.plotpath, "volavolumecorr"))
     display(plt)
 end
 
+function plot_logprobs(returns, startidx=Params.perfwindow[end]+1)
+    returns = collect(Base.Iterators.flatten(returns[startidx:end]))
+    returnshist = PyPlot.hist(returns, 100)
+    returnbins = returnshist[1]
+    steps = returnshist[2][2:end]
+    returnprobs = returnbins ./ sum(returnbins)
+    nmldistn = fit(Normal, returns)
+    pdfnormal = pdf.(nmldistn, steps)
+    normalprobs = pdfnormal ./ sum(pdfnormal)
+    StatsPlots.plot(steps, log10.(returnprobs), label=:"Actual returns",
+        xlabel=:"Daily stock returns", ylabel=:"log10 of return probability")
+    StatsPlots.plot!(steps, log10.(normalprobs), label=:"Fitted normal distn")
+    png(joinpath(Params.plotpath, "logprobs"))
+    display(plt)
+end
 
 end  # module Functions

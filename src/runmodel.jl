@@ -27,6 +27,8 @@ function runmodel(fundselector="probabilistic")
     Func.modelrun(market, stocks, investors, funds, fundselector)
     # Func.boundstest(market, stocks, investors, funds)
     Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume)
+    # save("examplereturns.jld", "stockvals", stocks.value,
+    #     "marketvals", market.value)
 end
 
 # TODO: Think about how I should have tested the initialisation
