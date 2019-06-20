@@ -4,6 +4,8 @@ using .Types, .Func, .Params
 
 function runmodel(fundselector="probabilistic")
 
+    println("Periods:", Params.bigt)
+    println("Stock impact range:", Params.default().impactrange)
     # Set up types
     market = Types.MarketIndex(
         zeros(Params.bigt))

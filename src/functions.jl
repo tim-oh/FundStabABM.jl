@@ -1,6 +1,6 @@
 module Func
 using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
-using Base.Iterators, PyPlot
+using Base.Iterators, PyPlot, Parameters
 
 include("types.jl")
 include("params.jl")
@@ -8,109 +8,80 @@ import .Types, .Params
 
 # TODO: Write docstrings to be used with Documenter.jl.
 
-function marketmove!(
-    marketvals,
-    t::Int,
-    drift=Params.drift,
-    marketvol=Params.marketvol)
-
+function marketmove!(marketvals, t::Int, params=Params.default())
+    @unpack drift, marketvol = params
     marketvals[t] = marketvals[t-1]*(1 + drift) + marketvol * randn()
-
     return marketvals
 end
 
-function marketinit!(
-    marketvals,
-    marketstartval=Params.marketstartval,
-    perfwindow=Params.perfwindow,
-    drift=Params.drift,
-    marketvol=Params.marketvol)
-
+function marketinit!(marketvals, params=Params.default())
+    @unpack marketstartval, perfwindow, drift, marketvol = params
     horizon = perfwindow[end]
     marketvals[1] = marketstartval
     for t in 2:horizon+1
-        Func.marketmove!(marketvals, t, drift, marketvol)
+        Func.marketmove!(marketvals, t, params)
     end
-
     return marketvals
 end
 
-function stockmove!(
-    stockvals,
-    t::Int,
-    mktvals,
-    betas,
-    stockvolas)
-
+function stockmove!(stockvals, t::Int, mktvals, betas, stockvolas)
     mktreturn = (mktvals[t] - mktvals[t-1]) / mktvals[t-1]
     stockvals[:, t] = ((1 .+ mktreturn .* betas) .* stockvals[:, t-1]) +
         stockvolas .* randn(length(stockvolas)) .* stockvals[:, t-1]
-
     return stockvals
 end
 
-function betainit!(
-    betas,
-    bigm=Params.bigm,
-    betastd=Params.betastd,
-    betamean=Params.betamean)
+# Keeping old function around - it's 30% faster
+# function betainit!(
+#     betas,
+#     bigm=Params.bigm,
+#     betastd=Params.betastd,
+#     betamean=Params.betamean)
+#
+#     betas .= randn(bigm) .* betastd .+ betamean
+#
+#     return betas
+# end
 
+function betainit!(betas, params=Params.default())
+    @unpack bigm, betastd, betamean  = params
     betas .= randn(bigm) .* betastd .+ betamean
-
     return betas
 end
 
 # Function for a discrete volatility range
-function stockvolinit!(
-    stockvol,
-    volrange=Params.stockvolrange,
-    bigm=Params.bigm)
-
-    stockvol .= rand(volrange, bigm)
-
+function stockvolinit!(stockvol, params=Params.default())
+    @unpack stockvolrange, bigm = params
+    stockvol .= rand(stockvolrange, bigm)
     return stockvol
 end
 
-function stockvalueinit!(
-    stocks,
-    marketvals,
-    stockstartval=Params.stockstartval,
-    perfwindow=Params.perfwindow)
-
+function stockvalueinit!(stocks, marketvals, params=Params.default())
+    @unpack stockstartval, perfwindow = params
     horizon = perfwindow[end]
     stocks.value[:,1] .= stockstartval
     for t in 2:(horizon + 1)
         stocks.value .= Func.stockmove!(
         stocks.value, t, marketvals, stocks.beta, stocks.vol)
     end
-
     return stocks.value
 end
 
-function stockimpactinit!(
-    impact,
-    impactrange=Params.impactrange)
-
+function stockimpactinit!(impact, params=Params.default())
+    @unpack impactrange = params
     impact .= rand(impactrange, length(impact))
-
     return impact
 end
 
-function invhorizoninit!(
-    horizons,
-    perfwindow=Params.perfwindow)
+function invhorizoninit!(horizons, params=Params.default())
+    @unpack perfwindow = params
     horizons .= rand(perfwindow, length(horizons))
-
     return horizons
 end
 
-function invthreshinit!(
-    thresholds,
-    mean=Params.thresholdmean,
-    std=Params.thresholdstd)
-
-    thresholds .= randn(length(thresholds)) * std .+ mean
-
+function invthreshinit!(thresholds, params=Params.default())
+    @unpack thresholdmean, thresholdstd = params
+    thresholds .= randn(length(thresholds)) .* thresholdstd .+ thresholdmean
     return thresholds
 end
 
@@ -715,7 +686,7 @@ function plot_stylisedfacts(
     demeanedstockreturnssquared = demeanedstockreturns.^2
     lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
     choice = rand(1:size(stockreturns,1))
-    pyplot() # as GR wasn't working, maybe fix that
+    #pyplot() # In case GR throws an error
     plot_pricehistories(stocksval, marketval)
     plot_marketreturnhistogram(demeanedmarketreturns)
     plot_stockreturnhistogram(demeanedstockreturns, choice)
@@ -819,6 +790,8 @@ function plot_volavolumecorr(volume, demeanedstockreturns)
 end
 
 function plot_logprobs(returns, startidx=Params.perfwindow[end]+1)
+    stdevs = StatsBase.std(returns, dims=2)
+    returns = returns ./ stdevs
     returns = collect(Base.Iterators.flatten(returns[startidx:end]))
     returnshist = PyPlot.hist(returns, 100)
     returnbins = returnshist[1]
@@ -827,9 +800,10 @@ function plot_logprobs(returns, startidx=Params.perfwindow[end]+1)
     nmldistn = fit(Normal, returns)
     pdfnormal = pdf.(nmldistn, steps)
     normalprobs = pdfnormal ./ sum(pdfnormal)
+    pyplot()
     StatsPlots.plot(steps, log10.(returnprobs), label=:"Actual returns",
-        xlabel=:"Daily stock returns", ylabel=:"log10 of return probability")
-    StatsPlots.plot!(steps, log10.(normalprobs), label=:"Fitted normal distn")
+        xlabel=:"Stocks' daily returns / st dev", ylabel=:"log10 of return probability")
+    plt = StatsPlots.plot!(steps, log10.(normalprobs), label=:"Fitted normal distn")
     png(joinpath(Params.plotpath, "logprobs"))
     display(plt)
 end

@@ -4,12 +4,31 @@ using FundStabABM.Func, FundStabABM.Types
 
 # QUESTION: How do I run the type tests periodically?
 
+testparams = @with_kw (
+    bigk = 3,
+    bign = 4,
+    bigm = 5,
+    bigt = 6,
+    marketstartval = 100,
+    drift = 0.05,
+    marketvol = 0.1,
+    perfwindow = 1:3,
+    betamean = 1,
+    betastd = 0.3,
+    stockstartval = 100,
+    stockvolrange = 0.01:0.01:0.1,
+    invcaprange = (10,1000),
+    thresholdmean = 0,
+    thresholdstd = 0.05,
+    portfsizerange = 1:5,
+    impactrange = 0.00001:0.00001:0.0001)
+
 # Small parameter values for testing, same list as in /src/params.jl
 const bigk = 3 # Number of funds, 3
 const bign = 4 # Number of investors, 4
 const bigm = 5 # Number of stocks, 5
 const bigt = 6 # Number of time periods, 6
-const mktstartval = 100 # Market index starting value, 100
+const marketstartval = 100 # Market index starting value, 100
 const drift = 0.05 # Market index drift, 0.05
 const marketvol = 0.1 # Market volatility (std?), 0.1
 const perfwindow = 1:3 # Performance window range for investors (1:3)
@@ -33,8 +52,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generated market index history is non-negative
     Random.seed!(0)
-    @test all(Func.marketinit!(market.value, mktstartval, perfwindow[end],
-     drift, marketvol) .>= 0)
+    @test all(Func.marketinit!(market.value, testparams()).>= 0)
     # TODO: Replace inequality with specific values, this one is in params_test
 
     # Test: generation of stock betas
@@ -45,20 +63,19 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
         zeros(bigm),
         zeros(bigm, bigt))
     Random.seed!(1)
-    @test Func.betainit!(stocks.beta, bigm, betastd, betamean) ==
+    @test Func.betainit!(stocks.beta, testparams()) ==
     1 .+ 0.3 .* randn(MersenneTwister(1), 5)
 
     # Test: generation of stock volatilities
     Random.seed!(2)
-    @test Func.stockvolinit!(stocks.vol, stockvolrange, bigm) ==
+    @test Func.stockvolinit!(stocks.vol, testparams()) ==
     vec([0.02 0.1 0.07 0.02 0.05])
 
     # Test: generation of stock values histories
     Random.seed!(2)
-    stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+    stocks.vol .= Func.stockvolinit!(stocks.vol, testparams())
     Random.seed!(3)
-    @test Func.stockvalueinit!(stocks, market.value, stockstartval,
-    perfwindow)[:,1:2] ≈
+    @test Func.stockvalueinit!(stocks, market.value, testparams())[:,1:2] ≈
     hcat(ones(5,1) .* 100,
     [105.51989943374585, 105.64929533253186, 104.15928328717519,
      105.05203007235151, 103.79227677999667] +
@@ -67,11 +84,11 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generation of stock impact parameters
     Random.seed!(4)
-    @test Func.stockimpactinit!(stocks.impact, impactrange) ==
+    @test Func.stockimpactinit!(stocks.impact, testparams()) ==
     [0.00008, 0.00004, 0.00007, 0.00001, 0.00004]
 
     Random.seed!(4)
-    Func.stockimpactinit!(stocks.impact, impactrange)
+    Func.stockimpactinit!(stocks.impact, testparams())
 
     investors = Types.RetailInvestor(
     zeros(bign, bigk + 1),
@@ -80,13 +97,12 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: generation of investor performance evaluation horizons
     Random.seed!(55)
-    @test Func.invhorizoninit!(investors.horizon, perfwindow) ==
+    @test Func.invhorizoninit!(investors.horizon, testparams()) ==
     [1, 3, 1, 1]
 
     # Test: generation of investor performance thresholds
     Random.seed!(2345)
-    @test Func.invthreshinit!(investors.threshold, thresholdmean,
-    thresholdstd) ==
+    @test Func.invthreshinit!(investors.threshold, testparams()) ==
     [0.022728468593375205,
     -0.03299475538810838,
      0.12695393970324698,
@@ -160,8 +176,7 @@ end # testset "Initialisation Functions"
     market = Types.MarketIndex(
         zeros(bigt))
     Random.seed!(0)
-    Func.marketinit!(
-    market.value, mktstartval, perfwindow[end], drift, marketvol)
+    Func.marketinit!(market.value, testparams())
     stocks = Types.Equity(
         zeros(bigm, bigt),
         zeros(bigm),
@@ -169,22 +184,21 @@ end # testset "Initialisation Functions"
         zeros(bigm),
         zeros(bigm, bigt))
     Random.seed!(1)
-    Func.betainit!(stocks.beta, bigm, betastd, betamean)
+    Func.betainit!(stocks.beta, testparams())
     Random.seed!(2)
-    stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+    stocks.vol .= Func.stockvolinit!(stocks.vol, testparams())
     Random.seed!(3)
-    Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)
+    Func.stockvalueinit!(stocks, market.value, testparams())
     Random.seed!(4)
-    Func.stockimpactinit!(stocks.impact, impactrange)
+    Func.stockimpactinit!(stocks.impact, testparams())
     investors = Types.RetailInvestor(
     zeros(bign, bigk + 1),
     zeros(bign),
     zeros(bign))
     Random.seed!(55)
-    investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
+    investors.horizon .= Func.invhorizoninit!(investors.horizon, testparams())
     Random.seed!(2345)
-    investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
-    thresholdstd)
+    investors.threshold .= Func.invthreshinit!(investors.threshold,testparams())
     Random.seed!(7)
     Func.invassetinit!(investors.assets, invcaprange, bigk)
     # NOTE Awkward scoping: Func.Types.EquityFund
@@ -212,10 +226,9 @@ end # testset "Initialisation Functions"
     # do the review or the resulting trading?
 
     Random.seed!(55)
-    investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
+    investors.horizon .= Func.invhorizoninit!(investors.horizon, testparams())
     Random.seed!(2345)
-    investors.threshold .= Func.invthreshinit!(
-    investors.threshold, thresholdmean, thresholdstd)
+    investors.threshold .= Func.invthreshinit!(investors.threshold,testparams())
     @test Func.perfreview(4, reviewers, investors, funds.value) == [3 3]
 
     # Test: Sell order amounts resulting from divestment
@@ -400,9 +413,10 @@ end # testset "Agent Behaviours"
 @testset "Price Functions" begin
 
     # Test: Random walk of market with drift
-    market = Types.MarketIndex([mktstartval; zeros(bigt-1)])
+    market = Types.MarketIndex([marketstartval; zeros(bigt-1)])
     Random.seed!(4)
-    @test Func.marketmove!(market.value, 2, 0.05, 0.1) ==
+    @test Func.marketmove!(market.value, 2,
+        testparams(drift = 0.05, marketvol = 0.1)) ==
     [100, 100 * (1 + 0.05) + 0.1 * randn(MersenneTwister(4)), 0, 0, 0, 0]
 
     # Test: Draw of stock price moves on basis of marketmove
@@ -479,7 +493,7 @@ market = Types.MarketIndex(
     zeros(bigt))
 
 Random.seed!(0)
-Func.marketinit!(market.value, mktstartval, perfwindow[end], drift, marketvol)
+Func.marketinit!(market.value, testparams())
 
 stocks = Types.Equity(
     zeros(bigm, bigt),
@@ -489,27 +503,26 @@ stocks = Types.Equity(
     zeros(bigm, bigt))
 
 Random.seed!(1)
-Func.betainit!(stocks.beta, bigm, betastd, betamean)
+Func.betainit!(stocks.beta, testparams())
 
 Random.seed!(2)
-stocks.vol .= Func.stockvolinit!(stocks.vol, stockvolrange, bigm)
+stocks.vol .= Func.stockvolinit!(stocks.vol, testparams())
 
 Random.seed!(3)
-Func.stockvalueinit!(stocks, market.value, stockstartval, perfwindow)
+Func.stockvalueinit!(stocks, market.value, testparams())
 
 Random.seed!(4)
-Func.stockimpactinit!(stocks.impact, impactrange)
+Func.stockimpactinit!(stocks.impact, testparams())
 
 investors = Types.RetailInvestor(zeros(bign, bigk + 1),
 zeros(bign),
 zeros(bign))
 
 Random.seed!(55)
-investors.horizon .= Func.invhorizoninit!(investors.horizon, perfwindow)
+investors.horizon .= Func.invhorizoninit!(investors.horizon, testparams())
 
 Random.seed!(2345)
-investors.threshold .= Func.invthreshinit!(investors.threshold, thresholdmean,
-thresholdstd)
+investors.threshold .= Func.invthreshinit!(investors.threshold, testparams())
 
 Random.seed!(7)
 Func.invassetinit!(investors.assets, invcaprange, bigk)
