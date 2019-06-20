@@ -1,23 +1,24 @@
-using Random
+using Random, Parameters
 
 using FundStabABM.Types
 using FundStabABM.Params
 using FundStabABM.Func
 
-
+params = Params.default()
+@unpack bigt, bigm, bign, bigk, marketstartval = params
 @testset "Market Type" begin
 
     market = Types.MarketIndex(vcat(
-        Params.marketstartval,
-        zeros(Params.bigt-1)))
+        marketstartval,
+        zeros(bigt-1)))
 
     @test isa(market, Types.MarketIndex)
 
     @test typeof(market.value) == Array{Float64, 1}
 
-    @test size(market.value) == (Params.bigt, )
+    @test size(market.value) == (bigt, )
 
-    @test market.value[1] == Params.marketstartval
+    @test market.value[1] == marketstartval
     @test all(market.value .>= 0)
 end
 
@@ -25,11 +26,11 @@ end
 @testset "Stocks Type" begin
 
     stocks = Types.Equity(
-        zeros(Params.bigm, Params.bigt),
-        zeros(Params.bigm),
-        zeros(Params.bigm),
-        zeros(Params.bigm),
-        zeros(Params.bigm, Params.bigt))
+        zeros(bigm, bigt),
+        zeros(bigm),
+        zeros(bigm),
+        zeros(bigm),
+        zeros(bigm, bigt))
 
     @test isa(stocks, Types.Equity)
 
@@ -39,11 +40,11 @@ end
     @test typeof(stocks.impact) == Array{Float64, 1}
     @test typeof(stocks.volume) == Array{Float64, 2}
 
-    @test size(stocks.value) == (Params.bigm, Params.bigt)
-    @test size(stocks.beta) == (Params.bigm,)
-    @test size(stocks.vol) == (Params.bigm,)
-    @test size(stocks.impact) == (Params.bigm,)
-    @test size(stocks.volume) == (Params.bigm, Params.bigt)
+    @test size(stocks.value) == (bigm, bigt)
+    @test size(stocks.beta) == (bigm,)
+    @test size(stocks.vol) == (bigm,)
+    @test size(stocks.impact) == (bigm,)
+    @test size(stocks.volume) == (bigm, bigt)
 
     # NOTE: No test of stock.beta now
     @test all(stocks.value .>= 0)
@@ -55,9 +56,9 @@ end
 @testset "Fund Type" begin
 
     funds = Types.EquityFund(
-    zeros(Params.bigk, Params.bigm),
-    zeros(Params.bigk, Params.bign),
-    zeros(Params.bigk, Params.bigt))
+    zeros(bigk, bigm),
+    zeros(bigk, bign),
+    zeros(bigk, bigt))
 
     @test isa(funds, Types.EquityFund)
 
@@ -69,18 +70,18 @@ end
     @test all(funds.stakes .>= 0)
     @test all(funds.value .>= 0)
 
-    @test size(funds.holdings) == (Params.bigk, Params.bigm)
-    @test size(funds.stakes) == (Params.bigk, Params.bign)
-    @test size(funds.value) == (Params.bigk, Params.bigt)
+    @test size(funds.holdings) == (bigk, bigm)
+    @test size(funds.stakes) == (bigk, bign)
+    @test size(funds.value) == (bigk, bigt)
 end
 
 
 @testset "Investor Type" begin
 
     investors = Types.RetailInvestor(
-    zeros(Params.bign, Params.bigk + 1),
-    zeros(Params.bign),
-    zeros(Params.bign))
+    zeros(bign, bigk + 1),
+    zeros(bign),
+    zeros(bign))
 
     @test isa(investors, Types.RetailInvestor)
 
@@ -88,9 +89,9 @@ end
     @test typeof(investors.horizon) == Array{Int64, 1}
     @test typeof(investors.threshold) == Array{Float64, 1}
 
-    @test size(investors.assets) == (Params.bign, Params.bigk + 1,)
-    @test size(investors.horizon) == (Params.bign,)
-    @test size(investors.threshold) == (Params.bign,)
+    @test size(investors.assets) == (bign, bigk + 1,)
+    @test size(investors.horizon) == (bign,)
+    @test size(investors.threshold) == (bign,)
 
     @test all(investors.assets .>= 0)
     @test all(investors.horizon .>= 0)
@@ -100,11 +101,11 @@ end
 @testset "Order Types" begin
 
     buyorder = Types.BuyMarketOrder(
-    Array{Float64}(undef, 0, Params.bigm),
+    Array{Float64}(undef, 0, bigm),
     Array{Int64}(undef, 0))
 
     sellorder = Types.SellMarketOrder(
-    Array{Float64}(undef, 0, Params.bigm),
+    Array{Float64}(undef, 0, bigm),
     Array{Int64}(undef, 0))
 
     @test isa(buyorder, Types.BuyMarketOrder)
@@ -115,9 +116,9 @@ end
     @test typeof(sellorder.values) == Array{Float64, 2}
     @test typeof(sellorder.investors) == Array{Int64, 1}
 
-    @test size(buyorder.values) == (0, Params.bigm)
+    @test size(buyorder.values) == (0, bigm)
     @test size(buyorder.funds) == (0, )
-    @test size(sellorder.values) == (0, Params.bigm)
+    @test size(sellorder.values) == (0, bigm)
     @test size(sellorder.investors) == (0, )
 
     @test all(buyorder.values .>= 0)

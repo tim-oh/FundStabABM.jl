@@ -3,18 +3,17 @@ using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
 using Base.Iterators, PyPlot, Parameters
 
 include("types.jl")
-include("params.jl")
-import .Types, .Params
+import .Types
 
 # TODO: Write docstrings to be used with Documenter.jl.
 
-function marketmove!(marketvals, t::Int, params=Params.default())
+function marketmove!(marketvals, t::Int, params)
     @unpack drift, marketvol = params
     marketvals[t] = marketvals[t-1]*(1 + drift) + marketvol * randn()
     return marketvals
 end
 
-function marketinit!(marketvals, params=Params.default())
+function marketinit!(marketvals, params)
     @unpack marketstartval, perfwindow, drift, marketvol = params
     horizon = perfwindow[end]
     marketvals[1] = marketstartval
@@ -43,20 +42,20 @@ end
 #     return betas
 # end
 
-function betainit!(betas, params=Params.default())
+function betainit!(betas, params)
     @unpack bigm, betastd, betamean  = params
     betas .= randn(bigm) .* betastd .+ betamean
     return betas
 end
 
 # Function for a discrete volatility range
-function stockvolinit!(stockvol, params=Params.default())
+function stockvolinit!(stockvol, params)
     @unpack stockvolrange, bigm = params
     stockvol .= rand(stockvolrange, bigm)
     return stockvol
 end
 
-function stockvalueinit!(stocks, marketvals, params=Params.default())
+function stockvalueinit!(stocks, marketvals, params)
     @unpack stockstartval, perfwindow = params
     horizon = perfwindow[end]
     stocks.value[:,1] .= stockstartval
@@ -67,71 +66,55 @@ function stockvalueinit!(stocks, marketvals, params=Params.default())
     return stocks.value
 end
 
-function stockimpactinit!(impact, params=Params.default())
+function stockimpactinit!(impact, params)
     @unpack impactrange = params
     impact .= rand(impactrange, length(impact))
     return impact
 end
 
-function invhorizoninit!(horizons, params=Params.default())
+function invhorizoninit!(horizons, params)
     @unpack perfwindow = params
     horizons .= rand(perfwindow, length(horizons))
     return horizons
 end
 
-function invthreshinit!(thresholds, params=Params.default())
+function invthreshinit!(thresholds, params)
     @unpack thresholdmean, thresholdstd = params
     thresholds .= randn(length(thresholds)) .* thresholdstd .+ thresholdmean
     return thresholds
 end
 
 # TODO: Sort out the capital range to match other items, as in rand(range, n)
-function invassetinit!(
-    invassets,
-    caprange=Params.invcaprange,
-    bigk=Params.bigk)
-
+function invassetinit!(invassets, params)
+    @unpack invcaprange, bigk = params
     ninvs = size(invassets, 1)
-    capital = rand(caprange[1]:caprange[2], ninvs)
+    capital = rand(invcaprange[1]:invcaprange[2], ninvs)
     for inv in 1:bigk
         invassets[inv, inv] = capital[inv]
     end
     for inv in (bigk+1):ninvs
         invassets[inv, rand(1:bigk)] = capital[inv]
     end
-
     return invassets
 end
 
-function fundcapitalinit!(
-    fundvals,
-    investorassets)
-
+function fundcapitalinit!(fundvals, investorassets)
     fundvals[:,1] .= sum(investorassets, dims=1)[1:end-1]
-
     return fundvals
 end
 
 # TODO: Test of this function didn't throw error when ncols was misspecified
 # as ncols=size(investorassets,1)- 1, i.e. wrong axis. Check why, write another
-function fundstakeinit!(
-    fundstakes,
-    investorassets)
-
+function fundstakeinit!(fundstakes, investorassets)
     ncols = size(investorassets, 2) - 1
     for col in 1:ncols
         fundstakes[col,:] = investorassets[:,col] ./ sum(investorassets[:,col])
     end
-
     return fundstakes
 end
 
-function fundholdinit!(
-    holdings,
-    initialcapital,
-    stockvals,
-    portfsizerange=Params.portfsizerange)
-
+function fundholdinit!(holdings, initialcapital, stockvals, params)
+    @unpack portfsizerange = params
     kfunds = size(holdings, 1)
     mstocks = size(holdings, 2)
     nofm = rand(portfsizerange, kfunds) # Number of stocks in each portfolio
@@ -146,12 +129,8 @@ function fundholdinit!(
     return holdings
 end
 
-function fundvalinit!(
-    fundvals,
-    holdings,
-    stockvals,
-    perfwindow=Params.perfwindow)
-
+function fundvalinit!(fundvals, holdings, stockvals, params)
+    @unpack perfwindow = params
     horizon = perfwindow[end]
     kfunds = size(fundvals, 1)
     for t in 2:(horizon + 1) # t=1 is initialised by fundcapitalinit!
@@ -159,16 +138,12 @@ function fundvalinit!(
             fundvals[k, t] = sum(holdings[k, :] .* stockvals[:, t])
         end
     end
-
     return fundvals
 end
 
-function drawreviewers(
-    bign=Params.bign,
-    reviewprob=Params.reviewprobability)
-
-    reviewers = rand(bign) .< reviewprob
-
+function drawreviewers(params)
+    @unpack bign, reviewprobability = params
+    reviewers = rand(bign) .< reviewprobability
     return findall(reviewers)
 end
 
@@ -176,12 +151,7 @@ end
 # value of investors' stakes over time?
 
 # TODO: Test that only a single investors.asset is > 0
-function perfreview(
-    t,
-    reviewers,
-    investors,
-    fundvals)
-
+function perfreview(t, reviewers, investors, fundvals)
     divestments = zeros(Int64, 1,2)
     for rev in reviewers
         horizon = investors.horizon[rev]
@@ -199,7 +169,6 @@ function perfreview(
             end
         end
     end
-
     return divestments
 end
 
@@ -208,56 +177,37 @@ end
 # QUESTION: Should I implement size and value checks for all intermediate outpts
 # NOTE: Passes one column of stock values only
 
-function liquidate!(
-    holdings,
-    stakes,
-    stockvals,
-    divestments)
-
+function liquidate!(holdings, stakes, stockvals, divestments)
     sellorders = Types.SellMarketOrder(
     Array{Float64}(undef, 0, size(holdings, 2)), Array{Float64}(undef, 0))
     for row in 1:size(divestments, 1)
         investor = divestments[row, 1]
         fund = divestments[row, 2]
-
         # Note the minus
         salevals = -stakes[fund, investor] .* (holdings[fund, :] .* stockvals)'
         sellorders.values = vcat(sellorders.values, salevals)
         sellorders.investors = vcat(sellorders.investors, investor)
-
         remainder = (1 - stakes[fund, investor])
         holdings[fund, :] = holdings[fund, :] .* remainder
-
         stakes[fund, investor] = 0
         if sum(stakes[fund,: ]) > 0
             stakes[fund, :] = stakes[fund, :] ./ sum(stakes[fund,: ])
         end
     end
-
     return sellorders, holdings, stakes
 end
 
 # NOTE: Truncate minimum stock value at 0.000000001
 # NOTE: Could move volume calculation into marketmake
-function marketmake!(
-    stocks,
-    t,
-    ordervals)
-
+function marketmake!(stocks, t, ordervals)
     netimpact = sum(ordervals, dims=1)' .* stocks.impact
     stocks.value[:, t] .= vec((1 .+ netimpact) .* stocks.value[:, t])
-
     nearzeroidx = findall(stocks.value[:, t] .< 0.000000001)
     stocks.value[nearzeroidx, t] .= 0.000000001
-
     return stocks.value
 end
 
-function executeorder!(
-    stocks,
-    t,
-    orders::Types.SellMarketOrder)
-
+function executeorder!(stocks, t,  orders::Types.SellMarketOrder)
     cashout = Array{Float64}(undef, 0, 2)
     oldstockvals = copy(stocks.value)
     stocks.value .= marketmake!(stocks, t, orders.values)
@@ -267,18 +217,13 @@ function executeorder!(
         amount = -sum(orders.values[order, :] .* priceratio)
         cashout = vcat(cashout, [investor amount])
     end
-
     return stocks.value, cashout
 end
 
 # NOTE: Small issue here that sell orders happen first, so sellers get a bad
 # price, followed by buyers who get a good price, ~midmarket as their order
 # neutralises the prior decline. However, the amount they buy is also diminished
-function executeorder!(
-    stocks,
-    t,
-    orders::Types.BuyMarketOrder)
-
+function executeorder!(stocks, t, orders::Types.BuyMarketOrder)
     mstocks = size(stocks.value, 1)
     sharesout = Array{Float64}(undef, 0, mstocks + 1)
     stocks.value .= marketmake!(stocks, t, orders.values)
@@ -287,17 +232,12 @@ function executeorder!(
         shares = (orders.values[order, :] ./ stocks.value[:, t])'
         sharesout = vcat(sharesout, [fund shares])
     end
-
     return stocks.value, sharesout
 end
 
 # QUESTION: Structure of disburse! methods is not symmetric in args... fix?
 # Disburse cash to investors following  sell order / divestment
-function disburse!(
-    invassets,
-    divestments,
-    cashout)
-
+function disburse!(invassets, divestments, cashout)
     for row in 1:size(divestments,1)
         inv = divestments[row, 1]
         fund = divestments[row, 2]
@@ -305,45 +245,32 @@ function disburse!(
         invassets[inv, fund] = 0
         invassets[inv, end] = cashout[row, 2]
     end
-
     return invassets
 end
 
 # Disburse shares to funds following buy order/investment, update value history
 # QUESTION: Why doesn't the value of funds drop as investors divest?
-function disburse!(
-    funds::Types.EquityFund,
-    sharesout,
-    stockvals)
-
+function disburse!(funds::Types.EquityFund, sharesout, stockvals)
     for row in 1:size(sharesout, 1)
         fund = convert(Int64, sharesout[row, 1])
         funds.holdings[fund, :] += sharesout[row, 2:end]
         fundrevalue!(funds, stockvals, [fund])
     end
-
     return funds
 end
 
-function fundrevalue!(
-    funds,
-    stockvals,
-    targets=1:Params.bigk)
-
+# TODO: Didn't error when I changed last argument from range to variable
+function fundrevalue!(funds, stockvals, targets)
     for k in targets
         funds.value[k, :] .= vec(funds.holdings[k, :]' * stockvals)
     end
-
     return funds.value
 end
 
-function respawn!(
-    funds,
-    investors,
-    t,
-    stockvals,
-    portfsizerange=Params.portfsizerange)
-
+# TODO: respawn test should have thrown error when I ran it without updating
+# inputs to fundholdinit!
+function respawn!(funds, investors, t, stockvals, params)
+    @unpack portfsizerange = params
     buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
     spawn = findall(vec(sum(funds.holdings, dims=2) .== 0))
@@ -359,31 +286,22 @@ function respawn!(
         investors.assets[inv, end] = 0
         # Re-use fund holdings init fctn to draw new stocks and generate order
         buyorder = (fundholdinit!(funds.holdings[egg, :]',
-        capital, stockvals[:, t], portfsizerange)' .* stockvals[:, t])'
+        capital, stockvals[:, t], params)' .* stockvals[:, t])'
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, egg)
         # Set anchor investor's stake
         funds.stakes[egg, inv] = 1
     end
-
     return buyorders, investors.assets, funds.stakes
 end
 
 # NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
 # which reduces the flow-performance relationship, especially if many funds die
 
-function reinvest!(
-    investors,
-    funds,
-    stockvals,
-    t,
-    selection="best")
-
+function reinvest!(investors, funds, stockvals, t, selection="probabilistic")
     kfunds = size(investors.assets, 2) - 1
-
     buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
-
     reinvestors = findall(vec(investors.assets[:, end] .> 0))
     for reinv in reinvestors
         injection = investors.assets[reinv, end]
@@ -405,7 +323,6 @@ function reinvest!(
         # Move cash into the fund
         investors.assets[reinv, choice] = injection
         investors.assets[reinv, end] = 0
-
         fundval = funds.holdings[choice, :]' * stockvals[:,t]
         # QUESTION: Should assert hold true, i.e. funds.value be unchanged?
         #@assert fundval == funds.value[choice, t]
@@ -413,55 +330,40 @@ function reinvest!(
         stakevals[reinv] = injection
         newcapital = fundval + injection
         funds.stakes[choice, :] .= stakevals ./ newcapital
-
         portfoliovalues = funds.holdings[choice, :] .* stockvals[:, t]
         buyorder = (portfoliovalues ./ fundval)' .* injection
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, choice)
     end
-
     return investors.assets, funds.stakes, buyorders
 end
 
-function horizonreturncalc(
-    fundvals,
-    horizon,
-    t)
-
+function horizonreturncalc(fundvals, horizon, t)
     horizonreturns =
         (fundvals[:, t] - fundvals[:, t-horizon]) ./ fundvals[:, t-horizon]
-
     return horizonreturns
 end
 
 function bestperformer(horizonreturns)
-
     _, bestfund = findmax(horizonreturns)
-
     return bestfund
 end
 
 # TODO: Test for goodenoughfund function
-function goodenoughfund(
-    horizonreturns,
-    threshold)
-
+function goodenoughfund(horizonreturns, threshold)
     candidates = findall(horizonreturns .> threshold)
     if size(candidates,1) == 0 # Choose best if none meet threshold
         _, goodenough = findmax(horizonreturns)
     else # Otherwise choose one at random from those that meet threshold
         goodenough = rand(candidates)
     end
-
     return goodenough
 end
 
 # NOTE: Could rationalise many in-loop operations by computation outside and
 # passing as an argument
 # TODO: Write a test for this function
-function probabilisticchoice(
-    horizonreturns)
-
+function probabilisticchoice(horizonreturns)
     probability = similar(horizonreturns)
     indices = 1:length(horizonreturns)
     normaliser = sum(indices)
@@ -470,58 +372,53 @@ function probabilisticchoice(
     @assert sum(probability) ≈ 1
     distn = Categorical(probability)
     fundchoice = rand(distn)
-
     return fundchoice
 end
 
 function randomchoice(horizonreturns)
-
     fundchoice = rand(1:length(horizonreturns))
-
     return fundchoice
 end
 
-function initialise(market, stocks, investors, funds)
-    Func.marketinit!(market.value)
-    Func.betainit!(stocks.beta)
-    Func.stockvolinit!(stocks.vol)
-    Func.stockvalueinit!(stocks, market.value)
-    Func.stockimpactinit!(stocks.impact)
-    Func.invhorizoninit!(investors.horizon)
-    Func.invthreshinit!(investors.threshold)
-    Func.invassetinit!(investors.assets)
+function initialise(market, stocks, investors, funds, params)
+    Func.marketinit!(market.value, params)
+    Func.betainit!(stocks.beta, params)
+    Func.stockvolinit!(stocks.vol, params)
+    Func.stockvalueinit!(stocks, market.value, params)
+    Func.stockimpactinit!(stocks.impact, params)
+    Func.invhorizoninit!(investors.horizon, params)
+    Func.invthreshinit!(investors.threshold, params)
+    Func.invassetinit!(investors.assets, params)
     Func.fundcapitalinit!(funds.value, investors.assets)
     Func.fundstakeinit!(funds.stakes, investors.assets)
-    Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value)
-    Func.fundvalinit!(funds.value, funds.holdings, stocks.value)
+    Func.fundholdinit!(funds.holdings, funds.value[:, 1], stocks.value, params)
+    Func.fundvalinit!(funds.value, funds.holdings, stocks.value, params)
 end
 
 function boundstest(market, stocks, investors, funds)
     @testset "Variable Bounds" begin
-
         @test all(stocks.value .>= 0)
         @test all(stocks.vol .>= 0)
         @test all(stocks.impact .>= 0)
-
         @test all(funds.holdings .>= 0)
         @test all(funds.stakes .>= 0)
         @test all(funds.value .>= 0)
-
         @test all(investors.assets .>= 0)
         @test all(investors.horizon .>= 0)
         @test all(1 .>= investors.threshold .>= -1)
     end
 end
 
-function modelrun(market, stocks, investors, funds,fundselector="bestperformer")
-    @showprogress for t in (Params.perfwindow[end]+2):Params.bigt
-
+function modelrun(market, stocks, investors, funds, params,
+        fundselector="bestperformer")
+    @unpack perfwindow, bigt, bigk = params
+    @showprogress for t in perfwindow[end]+2:bigt
         # Market index and assets move
-        Func.marketmove!(market.value, t)
+        Func.marketmove!(market.value, t, params)
         # Func.boundstest(market, stocks, investors, funds)
         Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
         # Func.boundstest(market, stocks, investors, funds)
-        Func.fundrevalue!(funds, stocks.value)
+        Func.fundrevalue!(funds, stocks.value, 1:bigk)
         # Func.boundstest(market, stocks, investors, funds)
         # print("Time: ", t)
         # QUESTION: Consider whether I should pass t instead of stocks.value[:, t]
@@ -530,58 +427,39 @@ function modelrun(market, stocks, investors, funds,fundselector="bestperformer")
         # TODO: No cashout of value 0
         # QUESTION: Enforce integers for fund/investor IDs in sellorders, cashout..?
         # QUESTION: Is a separate trackvolume! function appropriate?
-
         # Investors' performance review
-        reviewers = Func.drawreviewers()
+        reviewers = Func.drawreviewers(params)
         divestments = Func.perfreview(t, reviewers, investors, funds.value)
-
         # Run liquidation/reinvestment cycle if there are divestments
         if sum(divestments[1,:]) > 0
-
             sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
             stocks.value[:, t], divestments)
-
             Func.trackvolume!(stocks.volume, sellorders, t)
-
             _, cashout = Func.executeorder!(stocks, t, sellorders)
             Func.disburse!(investors.assets, divestments, cashout)
-
             # TODO: Write test that check correct outocme of the whole process,
             # step by step
-
             # Generate a new fund for each dead one, if there are dead ones
             if any(sum(funds.stakes, dims=2) .== 0)
-
-                buyorders, _, _ = Func.respawn!(funds, investors, t, stocks.value)
-
+                buyorders, _, _ = Func.respawn!(funds, investors, t,
+                    stocks.value, params)
                 Func.trackvolume!(stocks.volume, sellorders, t)
-
                 _, sharesout = Func.executeorder!(stocks, t, buyorders)
-
                 Func.disburse!(funds, sharesout, stocks.value)
-
             end # respawn loop
-
             # Re-value funds prior to reinvestment decisions
-            Func.fundrevalue!(funds, stocks.value)
-
+            Func.fundrevalue!(funds, stocks.value, 1:bigk)
             # If there are still investors with spare cash, they reinvest it
             if any(investors.assets[:, end] .> 0)
-
-                _, _, buyorders = Func.reinvest!(
-                investors, funds, stocks.value, t, fundselector)
-
+                _, _, buyorders = Func.reinvest!(investors, funds, stocks.value,
+                    t, fundselector)
                 Func.trackvolume!(stocks.volume, sellorders, t)
-
                 _, sharesout = Func.executeorder!(stocks, t, buyorders)
-
                 Func.disburse!(funds, sharesout, stocks.value)
             end # reinvestment loop
-
         end # Divestment loop
     end # Model run loop
 end # runmodel function
-
 
 # TODO: Write tests for both assetreturns functions and vecreturns
 # NOTE: Duplication in assetreturns and demean, i.e. targets for refactoring
@@ -611,7 +489,7 @@ function subtractmean(returns::Array{Float64,1})
 end
 
 # TODO: Test demean functions
-function demean(returns::Array{Float64,1})
+function demean(returns::Vector{Float64})
     demeanedreturns = subtractmean(returns)
     return demeanedreturns
 end
@@ -625,10 +503,12 @@ function demean(returns::Array{Float64,2})
     end
     return demeanedreturns
 end
-function calckurtoses(returns, startidx=Params.perfwindow[end]+1)
-    nassets = size(returns, 1)
-    kurtoses = zeros(nassets)
-    for asset in 1:nassets
+
+function calckurtoses(returns, params)
+    @unpack perfwindow, bigm = params
+    startidx = perfwindow[end] + 1
+    kurtoses = zeros(bigm)
+    for asset in 1:bigm
         kurtoses[asset] = kurtosis(returns[asset, startidx:end])
     end
     return kurtoses
@@ -647,10 +527,11 @@ function trackvolume!(volume, order::Types.SellMarketOrder, t)
 end
 
 # TODO: Test for volavolumecorr
-function volavolumecorr(volumes, returns, startidx=Params.perfwindow[end]+1)
-    nassets = size(volumes, 1)
-    correlation = zeros(nassets)
-    for asset in 1:nassets
+function volavolumecorr(volumes, returns, params)
+    @unpack perfwindow, bigm = params
+    startidx = perfwindow[end] + 1
+    correlation = zeros(bigm)
+    for asset in 1:bigm
         correlation[asset] =
         StatsBase.cor(volumes[asset, (startidx+1):end],
         broadcast(abs, returns[asset, startidx:end]))
@@ -659,10 +540,11 @@ function volavolumecorr(volumes, returns, startidx=Params.perfwindow[end]+1)
 end
 
 # TODO: Test for lossgainratio
-function lossgainratio(returns, cutoff, startidx=Params.perfwindow[end]+1)
-    nassets = size(returns, 1)
-    ratios = zeros(nassets)
-    for asset in 1:nassets
+function lossgainratio(returns, cutoff, params)
+    @unpack perfwindow, bigm = params
+    startidx = perfwindow[end] + 1
+    ratios = zeros(bigm)
+    for asset in 1:bigm
         stock = returns[asset, startidx:end]
         absolutevals = broadcast(abs, stock)
         largeamount = percentile(absolutevals, cutoff)
@@ -676,8 +558,9 @@ end
 # TODO: move plots to separate file
 # TODO: save plots in plots file
 
-function plot_stylisedfacts(
-    marketval, stocksval, stocksvolume, returnspctile=5)
+function plot_stylisedfacts(marketval, stocksval, stocksvolume, params,
+        returnspctile=5)
+    @unpack perfwindow, plotpath = params
     marketreturns = Func.assetreturns(marketval)
     stockreturns = Func.assetreturns(stocksval)
     demeanedmarketreturns = Func.demean(marketreturns)
@@ -687,112 +570,140 @@ function plot_stylisedfacts(
     lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
     choice = rand(1:size(stockreturns,1))
     #pyplot() # In case GR throws an error
-    plot_pricehistories(stocksval, marketval)
-    plot_marketreturnhistogram(demeanedmarketreturns)
-    plot_stockreturnhistogram(demeanedstockreturns, choice)
-    plot_marketpacf(demeanedmarketreturns, lags)
-    plot_stockpacf(demeanedstockreturns, choice, lags)
-    plot_marketvolaclustering(demeanedmarketreturnssquared, lags)
-    plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags)
-    plot_stockkurtoses(demeanedstockreturns)
-    plot_lossgainratio(demeanedstockreturns, returnspctile)
-    plot_volavolumecorr(stocksvolume, demeanedstockreturns)
-    plot_logprobs(demeanedstockreturns)
+    plot_pricehistories(stocksval, marketval, plotpath)
+    plot_marketreturnhistogram(demeanedmarketreturns, plotpath)
+    plot_stockreturnhistogram(demeanedstockreturns, choice, plotpath)
+    plot_marketpacf(demeanedmarketreturns, lags, plotpath)
+    plot_stockpacf(demeanedstockreturns, choice, lags, plotpath)
+    plot_marketvolaclustering(demeanedmarketreturnssquared, lags, plotpath)
+    plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags,plotpath)
+    plot_stockkurtoses(demeanedstockreturns, plotpath, params)
+    plot_lossgainratio(demeanedstockreturns, returnspctile, plotpath, params)
+    plot_volavolumecorr(stocksvolume, demeanedstockreturns, plotpath, params)
+    plot_logprobs(demeanedstockreturns, perfwindow, plotpath)
 end
 
 # TODO: refactor plots - DRY
-function plot_pricehistories(stocksval, marketval)
+function plot_pricehistories(stocksval, marketval, plotpath)
     periods = 1:length(marketval)
     nstocks = 1:100
     StatsPlots.plot(periods, transpose(stocksval)[:, nstocks], legend=:none,
     title="Asset prices history (market in black)")
     plt = StatsPlots.plot!(
         periods, marketval, lw=3, lc=:black, label="Market index")
-    png(joinpath(Params.plotpath, "returnshistory"))
+    png(joinpath(plotpath, "returnshistory"))
     display(plt)
 end
 
-function plot_marketreturnhistogram(asset)
-    StatsPlots.histogram(asset, bins=100, title="Market returns vs normal distribution", label="Market returns", legend=:topright)
+function plot_marketreturnhistogram(asset, plotpath)
+    StatsPlots.histogram(asset, bins=100,
+        title="Market returns vs normal distribution", label="Market returns", legend=:topright)
     x = findmin(asset)[1]:0.001:findmax(asset)[1]
     d = fit(Normal, asset)
     plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
-    png(joinpath(Params.plotpath, "marketreturnsvsnormal"))
+    png(joinpath(plotpath, "marketreturnsvsnormal"))
     display(plt)
 end
 
-function plot_stockreturnhistogram(demeanedstockreturns, choice)
+function plot_stockreturnhistogram(demeanedstockreturns, choice, plotpath)
     asset = demeanedstockreturns[choice, :]
-    StatsPlots.histogram(asset, bins=100, title="Example of stock returns", label="Random stock's returns", legend=:topright)
+    StatsPlots.histogram(asset, bins=100, title="Example of stock returns",
+        label="Random stock's returns", legend=:topright)
     x = findmin(asset)[1]:0.001:findmax(asset)[1]
     d = fit(Normal, asset)
     plt = StatsPlots.plot!(x, pdf.(d, x), lc=:red, label="Normal distn")
-    png(joinpath(Params.plotpath, "stockreturnsvsnormal"))
+    png(joinpath(plotpath, "stockreturnsvsnormal"))
     display(plt)
 end
 
-function plot_marketpacf(demeanedmarketreturns, lags)
+function plot_marketpacf(demeanedmarketreturns, lags, plotpath)
     asset = demeanedmarketreturns
     pacfcoeffs = pacf(demeanedmarketreturns, lags)
-    StatsPlots.bar(pacfcoeffs, title="Market autocorrelation", label="Partial correlation coefficients")
-    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="critical values", legend=:bottomright)
-    png(joinpath(Params.plotpath, "marketautocorrelation"))
+    StatsPlots.bar(pacfcoeffs, title="Market autocorrelation",
+        label="Partial correlation coefficients")
+    plt = StatsPlots.plot!(0:0.01:10,
+        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
+        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        lc=:red, label="critical values", legend=:bottomright)
+    png(joinpath(plotpath, "marketautocorrelation"))
     display(plt)
 end
 
-function plot_stockpacf(demeanedstockreturns, choice, lags)
+function plot_stockpacf(demeanedstockreturns, choice, lags, plotpath)
     asset = demeanedstockreturns[choice,: ]
     pacfcoeffs = pacf(asset, lags)
-    StatsPlots.bar(pacfcoeffs, title="Stock autocorrelation (random stock example)", label="Partial autocorrelation coefficients, demeaned returns", legend=:bottomright)
-    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png(joinpath(Params.plotpath, "stockautocorrelation"))
+    StatsPlots.bar(pacfcoeffs,
+        title="Stock autocorrelation (random stock example)",
+        label="Partial autocorrelation coefficients, demeaned returns",
+        legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10,
+        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
+        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        lc=:red, label="Critical values")
+    png(joinpath(plotpath, "stockautocorrelation"))
     display(plt)
 end
 
-function plot_marketvolaclustering(demeanedmarketreturnssquared, lags)
+function plot_marketvolaclustering(demeanedmarketreturnssquared, lags, plotpath)
     asset = demeanedmarketreturnssquared
     pacfcoeffs = pacf(asset, lags)
-    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, market", label="Partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
-    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png(joinpath(Params.plotpath, "marketvolaclustering"))
+    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, market",
+        label="Partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10,
+        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
+        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        lc=:red, label="Critical values")
+    png(joinpath(plotpath, "marketvolaclustering"))
     display(plt)
 end
 
-function plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags)
+function plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags,
+        plotpath)
     asset = demeanedstockreturnssquared[choice,:]
     pacfcoeffs = pacf(asset, lags)
-    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock", label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
-    plt = StatsPlots.plot!(0:0.01:10, [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)), -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),], lc=:red, label="Critical values")
-    png(joinpath(Params.plotpath, "stockvolaclustering"))
+    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock",
+        label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
+    plt = StatsPlots.plot!(0:0.01:10,
+        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
+        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        lc=:red, label="Critical values")
+    png(joinpath(plotpath, "stockvolaclustering"))
     display(plt)
 end
 
-function plot_stockkurtoses(demeanedstockreturns)
-    stockkurtoses = Func.calckurtoses(demeanedstockreturns)
-    plt = StatsPlots.bar(sort!(stockkurtoses, rev=true), title="Kurtoses of stock returns", label="Kurtoses")
-    png(joinpath(Params.plotpath, "kurtoses"))
+function plot_stockkurtoses(demeanedstockreturns, plotpath, params)
+    stockkurtoses = Func.calckurtoses(demeanedstockreturns, params)
+    plt = StatsPlots.bar(sort!(stockkurtoses, rev=true),
+        title="Kurtoses of stock returns", label="Kurtoses")
+    png(joinpath(plotpath, "kurtoses"))
     display(plt)
 end
 
-function plot_lossgainratio(demeanedstockreturns, returnspercentile)
-    ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile)
-    StatsPlots.plot(ratios, title="Gain-loss asymmetry in stock returns", label="# large losses / # large gains")
-    plt = StatsPlots.plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios), label="Mean ratio")
-    png(joinpath(Params.plotpath, "lossgainratio"))
+function plot_lossgainratio(demeanedstockreturns, returnspercentile, plotpath,
+        params)
+    ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile, params)
+    StatsPlots.plot(ratios, title="Gain-loss asymmetry in stock returns",
+        label="# large losses / # large gains")
+    plt = StatsPlots.plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios),
+        label="Mean ratio")
+    png(joinpath(plotpath, "lossgainratio"))
     display(plt)
 end
 
-function plot_volavolumecorr(volume, demeanedstockreturns)
-    corrs = Func.volavolumecorr(volume, demeanedstockreturns)
-    plt = StatsPlots.bar(sort(corrs, rev=true), title="Volume-volatility correlation of stocks", label="Volume - absolute return correlation coefficients")
-    png(joinpath(Params.plotpath, "volavolumecorr"))
+function plot_volavolumecorr(volume, demeanedstockreturns, plotpath, params)
+    corrs = Func.volavolumecorr(volume, demeanedstockreturns, params)
+    plt = StatsPlots.bar(sort(corrs, rev=true),
+        title="Volume-volatility correlation of stocks",
+        label="Volume - absolute return correlation coefficients")
+    png(joinpath(plotpath, "volavolumecorr"))
     display(plt)
 end
 
-function plot_logprobs(returns, startidx=Params.perfwindow[end]+1)
-    stdevs = StatsBase.std(returns, dims=2)
+function plot_logprobs(returns, perfwindow, plotpath)
+    startidx = perfwindow[end]+1
+    stdevs = StatsBase.std(returns[:, startidx:end], dims=2)
     returns = returns ./ stdevs
-    returns = collect(Base.Iterators.flatten(returns[startidx:end]))
+    returns = collect(Base.Iterators.flatten(returns[:, startidx:end]))
     returnshist = PyPlot.hist(returns, 100)
     returnbins = returnshist[1]
     steps = returnshist[2][2:end]
@@ -802,9 +713,11 @@ function plot_logprobs(returns, startidx=Params.perfwindow[end]+1)
     normalprobs = pdfnormal ./ sum(pdfnormal)
     pyplot()
     StatsPlots.plot(steps, log10.(returnprobs), label=:"Actual returns",
-        xlabel=:"Stocks' daily returns / st dev", ylabel=:"log10 of return probability")
-    plt = StatsPlots.plot!(steps, log10.(normalprobs), label=:"Fitted normal distn")
-    png(joinpath(Params.plotpath, "logprobs"))
+        xlabel=:"Stocks' daily returns / st dev",
+        ylabel=:"log10 of return probability")
+    plt = StatsPlots.plot!(steps, log10.(normalprobs),
+        label=:"Fitted normal distn")
+    png(joinpath(plotpath, "logprobs"))
     display(plt)
 end
 

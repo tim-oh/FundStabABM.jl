@@ -1,4 +1,4 @@
-using Test, Random, LinearAlgebra, Traceur
+using Test, Random, LinearAlgebra, Traceur, Parameters
 
 using FundStabABM.Func, FundStabABM.Types
 
@@ -21,28 +21,10 @@ testparams = @with_kw (
     thresholdmean = 0,
     thresholdstd = 0.05,
     portfsizerange = 1:5,
-    impactrange = 0.00001:0.00001:0.0001)
+    impactrange = 0.00001:0.00001:0.0001,
+    reviewprobability = 1/63)
 
-# Small parameter values for testing, same list as in /src/params.jl
-const bigk = 3 # Number of funds, 3
-const bign = 4 # Number of investors, 4
-const bigm = 5 # Number of stocks, 5
-const bigt = 6 # Number of time periods, 6
-const marketstartval = 100 # Market index starting value, 100
-const drift = 0.05 # Market index drift, 0.05
-const marketvol = 0.1 # Market volatility (std?), 0.1
-const perfwindow = 1:3 # Performance window range for investors (1:3)
-const betamean = 1 # Average stock beta, 1
-const betastd = 0.3 # Stock beta dispersion, 0.3
-const stockstartval = 100 # Starting value of stocks
-const stockvolrange = range(0.01, stop=0.1, step=0.01)
-# Range of stock volatility (0.1, 0.5). Consider if it should be continuous.
-const invcaprange = (10,1000) # Investors' range of initial capital, (10, 1000)
-const thresholdmean = 0 # Average investor return threshold for her fund
-const thresholdstd = 0.05 # Standard deviation of investor return thresholds
-const portfsizerange = 1:5 # Range of number of stocks in fund portfolio (1,5)
-const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency unit
-
+@unpack bigt, bigm, bign, bigk = testparams()
 
 @testset "Initialisation Functions" begin
 
@@ -111,7 +93,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: first bigk investors put their money in funds with matching indices
     Random.seed!(7)
     @test LinearAlgebra.diag(Func.invassetinit!(investors.assets,
-    invcaprange, bigk)[1:bigk, 1:bigk]) == [318, 111, 692]
+        testparams())[1:bigk, 1:bigk]) == [318, 111, 692]
 
     # Test: no investor holds cash at the beginning
     @test all(investors.assets[:, end] .== 0)
@@ -151,7 +133,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
     # Test: Generation of fund holdings
     Random.seed!(8)
     @test Func.fundholdinit!(
-    funds.holdings, funds.value[:, 1], stocks.value[:, 1], portfsizerange) ≈
+    funds.holdings, funds.value[:, 1], stocks.value[:, 1], testparams()) ≈
     [0 0 0 318/100 0;
      1003/500 0 3009/500 1003/500 0;
      692/200 0 0 692/200 0]
@@ -161,7 +143,7 @@ const impactrange = 0.00001:0.00001:0.0001 # Stock price impact per currency uni
 
     # Test: Generation of fund value history
     @test Func.fundvalinit!(
-    funds.value, funds.holdings, stocks.value, perfwindow[end]) ≈
+    funds.value, funds.holdings, stocks.value, testparams(perfwindow=3:3,)) ≈
     hcat([318, 1003, 692],
     [327.8755848664943 ,1137.5171362972462, 730.0895512124052],
     [351.09084866012824, 1187.1302928457408, 764.4838542466905],
@@ -200,7 +182,7 @@ end # testset "Initialisation Functions"
     Random.seed!(2345)
     investors.threshold .= Func.invthreshinit!(investors.threshold,testparams())
     Random.seed!(7)
-    Func.invassetinit!(investors.assets, invcaprange, bigk)
+    Func.invassetinit!(investors.assets, testparams())
     # NOTE Awkward scoping: Func.Types.EquityFund
     funds = Func.Types.EquityFund(
         zeros(bigk, bigm),
@@ -210,17 +192,17 @@ end # testset "Initialisation Functions"
     Func.fundstakeinit!(funds.stakes, investors.assets)
     Random.seed!(8)
     Func.fundholdinit!(funds.holdings, funds.value[:, 1],
-    stocks.value[:, 1], portfsizerange)
+    stocks.value[:, 1], testparams())
     Func.fundvalinit!(
-    funds.value, funds.holdings, stocks.value, perfwindow[end])
+    funds.value, funds.holdings, stocks.value, testparams(perfwindow=3:3))
 
     # Test: Random selection of investors that conduct a performance review
     Random.seed!(333333333333333333)
-    @test Func.drawreviewers(bign) == [3]
+    @test Func.drawreviewers(testparams()) == [3]
 
     # Test: Fund-investor pairs for divestment following performance review
     Random.seed!(333333333333333333)
-    reviewers = Func.drawreviewers(bign)
+    reviewers = Func.drawreviewers(testparams())
 
     # QUESTION: In terms of the model dynamics, is there a 'neutral' time to
     # do the review or the resulting trading?
@@ -312,8 +294,7 @@ end # testset "Initialisation Functions"
 
     # Test: Stock-values-part of buy order following fund re-birth
     Random.seed!(10)
-    respawn_output = Func.respawn!(
-    funds, investors, 3, stocks.value, portfsizerange)
+    respawn_output = Func.respawn!(funds,investors, 3,stocks.value,testparams())
     @test respawn_output[1].values ≈
     [298.574 0.0 149.287 298.574 0.0] atol = 0.0001
 
@@ -380,11 +361,11 @@ end # testset "Initialisation Functions"
 
     # Test: Reallocation of spare investor cash to a fund
     # NOTE: investors.assets don't update automatically, tracks initial investmt
-    reinvestresults = Func.reinvest!(investors, funds, stocks.value, 3)
-    @test reinvestresults[1] ==
+    reinvestresults = Func.reinvest!(investors, funds, stocks.value, 3, "best")
+    @test reinvestresults[1] ≈
     [318.0 0.0 0.0 0.0;
      0.0 111.0 0.0 0.0;
-     0.0 0.0 746.434849083664 0.0;
+     0.0 0.0 746.434849083664 0.0
      1021.6613450347874 0.0 0.0 0.0]
 
     # Test: Update of investor stakes in funds
@@ -525,7 +506,7 @@ Random.seed!(2345)
 investors.threshold .= Func.invthreshinit!(investors.threshold, testparams())
 
 Random.seed!(7)
-Func.invassetinit!(investors.assets, invcaprange, bigk)
+Func.invassetinit!(investors.assets, testparams())
 
 # NOTE Awkward scoping: Func.Types.EquityFund
 funds = Func.Types.EquityFund(
@@ -539,13 +520,13 @@ Func.fundstakeinit!(funds.stakes, investors.assets)
 
 Random.seed!(8)
 Func.fundholdinit!(funds.holdings, funds.value[:, 1],
-stocks.value[:, 1], portfsizerange)
+stocks.value[:, 1], testparams())
 
 Func.fundvalinit!(
-funds.value, funds.holdings, stocks.value, perfwindow[end])
+funds.value, funds.holdings, stocks.value, testparams(perfwindow=3:3, ))
 
 Random.seed!(333333333333333333)
-reviewers = Func.drawreviewers(bign)
+reviewers = Func.drawreviewers(testparams())
 Func.perfreview(4, reviewers, investors, funds.value)
 
 divestments = [3 3; 4 2]
@@ -561,8 +542,7 @@ cashout = [3.0 746.434849083664; 4.0 1021.6613450347874]
 Func.disburse!(investors.assets, divestments, cashout)
 
 Random.seed!(10)
-respawn_output = Func.respawn!(
-funds, investors, 3, stocks.value, portfsizerange)
+respawn_output = Func.respawn!(funds, investors, 3, stocks.value, testparams())
 
 buyorder = respawn_output[1]
 buymarketmakeresults = Func.executeorder!(stocks, 3, buyorder)
