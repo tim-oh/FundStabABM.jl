@@ -4,7 +4,7 @@ using Parameters
 default = @with_kw (
 bigm = 200, # Number of stocks
 bign = 500, # Number of investors
-bigt = 1100, # Number of days
+bigt = 2600, # Number of days
 bigk = 200, # Number of funds
 
 # Market parameters

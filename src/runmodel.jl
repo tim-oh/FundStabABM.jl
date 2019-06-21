@@ -1,9 +1,10 @@
 using Test, Random, LinearAlgebra, StatsBase, StatsPlots, Distributions
-using Traceur, Parameters
+using Traceur, Parameters, Logging, Dates
 
 using .Types, .Func, .Params
 
-function runmodel(;params=Params.default(), fundselector="probabilistic")
+function runmodel(params=Params.default(); fundselector="probabilistic",
+        doplot=false, boundstest=false)
     @unpack bigk, bigm, bign, bigt, impactrange, perfwindow, plotpath = params
     println("Run for ", bigt, " periods")
     println("Stock impact range:", impactrange)
@@ -26,13 +27,27 @@ function runmodel(;params=Params.default(), fundselector="probabilistic")
         zeros(bigk, bigt))
 
     Func.initialise(market, stocks, investors, funds, params)
-    #Func.boundstest(market, stocks, investors, funds)
+
+    if boundstest
+        Func.boundstest(market, stocks, investors, funds)
+    end
+
     Func.modelrun(market, stocks, investors, funds, params, fundselector)
-    Func.boundstest(market, stocks, investors, funds)
-    Func.plot_stylisedfacts(market.value, stocks.value, stocks.volume, params)
-    # save("examplereturns.jld", "stockvals", stocks.value,
-    #     "marketvals", market.value)
-end
+
+    if boundstest
+        Func.boundstest(market, stocks, investors, funds)
+    end
+
+    if doplot
+        Func.plot_stylisedfacts(market.value, stocks.value,stocks.volume,params)
+        io = open(joinpath(plotpath, "parameters.txt"), "w+")
+        logger = SimpleLogger(io)
+        with_logger(logger) do
+            @info "Parameters" Dates.today() Dates.Time(Dates.now()) params
+        end
+        close(io)
+    end
+end # runmodel()
 
 # TODO: Think about how I should have tested the initialisation
 # TODO: Set test=true flag for testing bounds and other such things

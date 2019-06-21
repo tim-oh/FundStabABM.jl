@@ -3,6 +3,7 @@
 *.jl.mem
 *.png
 *.jld
+*.txt
 tmp.*
 tst.jl
 deps/deps.jl
