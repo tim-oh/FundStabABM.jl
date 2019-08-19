@@ -38,21 +38,20 @@ function runmodel(params=Params.default(); fundselector="probabilistic",
         Func.boundstest(market, stocks, investors, funds)
     end
 
+    stylefacts = Func.calc_stylisedfacts(market.value, stocks.value,
+        stocks.volume, params)
+
     if doplot
-        Func.plot_stylisedfacts(market.value, stocks.value,stocks.volume,params)
+        Func.plot_stylisedfacts(market.value, stocks.value, stylefacts, params)
         io = open(joinpath(plotpath, "parameters.txt"), "w+")
         logger = SimpleLogger(io)
         with_logger(logger) do
-            @info "Parameters" Dates.today() Dates.Time(Dates.now()) params
+            @info "Parameters" Dates.today() Dates.Time(Dates.now()) fundselector params
         end
         close(io)
     end
 end # runmodel()
 
 # TODO: Think about how I should have tested the initialisation
-# TODO: Set test=true flag for testing bounds and other such things
-#  or is that bad practice?
-# TODO: Create logging set-up that records parameters, plots and outputs
 # TODO: Think about how I should have tested the running cycle
-# TODO: Write functions that collect activity of a) selling out and b) buying in
 # TODO: Tests for cases with empty reviewers, divestments

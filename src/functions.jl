@@ -1,15 +1,18 @@
 module Func
 using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
-using Base.Iterators, PyPlot, Parameters
+using Base.Iterators, Parameters
+using PyPlot
 
 include("types.jl")
 import .Types
 
 # TODO: Write docstrings to be used with Documenter.jl.
 
+# TODO: Change bracket, marketvol*randn() should be inside the bracket!
+
 function marketmove!(marketvals, t::Int, params)
     @unpack drift, marketvol = params
-    marketvals[t] = marketvals[t-1]*(1 + drift) + marketvol * randn()
+    marketvals[t] = marketvals[t-1]*(1 + drift + marketvol * randn())
     return marketvals
 end
 
@@ -413,33 +416,19 @@ function modelrun(market, stocks, investors, funds, params,
         fundselector="bestperformer")
     @unpack perfwindow, bigt, bigk = params
     @showprogress for t in perfwindow[end]+2:bigt
-        # Market index and assets move
         Func.marketmove!(market.value, t, params)
-        # Func.boundstest(market, stocks, investors, funds)
         Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
-        # Func.boundstest(market, stocks, investors, funds)
         Func.fundrevalue!(funds, stocks.value, 1:bigk)
-        # Func.boundstest(market, stocks, investors, funds)
-        # print("Time: ", t)
-        # QUESTION: Consider whether I should pass t instead of stocks.value[:, t]
-        # Investors (may_ sell out of underperforming funds
         # TODO: Test sellorders.investors == cashout[1,:], similar for buyorders
-        # TODO: No cashout of value 0
-        # QUESTION: Enforce integers for fund/investor IDs in sellorders, cashout..?
-        # QUESTION: Is a separate trackvolume! function appropriate?
-        # Investors' performance review
         reviewers = Func.drawreviewers(params)
         divestments = Func.perfreview(t, reviewers, investors, funds.value)
-        # Run liquidation/reinvestment cycle if there are divestments
         if sum(divestments[1,:]) > 0
             sellorders, _, _ = Func.liquidate!(funds.holdings, funds.stakes,
             stocks.value[:, t], divestments)
             Func.trackvolume!(stocks.volume, sellorders, t)
             _, cashout = Func.executeorder!(stocks, t, sellorders)
             Func.disburse!(investors.assets, divestments, cashout)
-            # TODO: Write test that check correct outocme of the whole process,
-            # step by step
-            # Generate a new fund for each dead one, if there are dead ones
+            # TODO: Write test that check each step of modelrun()
             if any(sum(funds.stakes, dims=2) .== 0)
                 buyorders, _, _ = Func.respawn!(funds, investors, t,
                     stocks.value, params)
@@ -468,17 +457,19 @@ function vecreturns(vector::Array{Float64,1})
     return returnsvec
 end
 
-function assetreturns(vector::Array{Float64,1})
-    returnsvec = vecreturns(vector)
+function assetreturns(vector::Array{Float64,1}, perfwindow)
+    startidx = perfwindow[end] + 1
+    returnsvec = vecreturns(vector)[startidx:end]
     return returnsvec
 end
 
-function assetreturns(array::Array{Float64,2})
+function assetreturns(array::Array{Float64,2}, perfwindow)
+    startidx = perfwindow[end] + 1
     nassets = size(array, 1)
-    nperiods = size(array, 2)
-    returnsarray = zeros(nassets, nperiods-1)
+    nperiods = size(array, 2) - perfwindow[end] -1
+    returnsarray = zeros(nassets, nperiods)
     for asset in 1:nassets
-        returnsarray[asset,:] .= vecreturns(array[asset,:])
+        returnsarray[asset,:] .= vecreturns(array[asset, startidx:end])
     end
     return returnsarray
 end
@@ -504,12 +495,11 @@ function demean(returns::Array{Float64,2})
     return demeanedreturns
 end
 
-function calckurtoses(returns, params)
-    @unpack perfwindow, bigm = params
-    startidx = perfwindow[end] + 1
+function calc_kurtoses(returns)
+    bigm = size(returns, 1)
     kurtoses = zeros(bigm)
     for asset in 1:bigm
-        kurtoses[asset] = kurtosis(returns[asset, startidx:end])
+        kurtoses[asset] = kurtosis(returns[asset, :])
     end
     return kurtoses
 end
@@ -521,20 +511,20 @@ function trackvolume!(volume, order::Types.BuyMarketOrder, t)
     return volume
 end
 
+# TODO: Test for trackvolume!
 function trackvolume!(volume, order::Types.SellMarketOrder, t)
     volume[:, t] -= sum(order.values, dims=1)'
     return volume
 end
 
 # TODO: Test for volavolumecorr
-function volavolumecorr(volumes, returns, params)
-    @unpack perfwindow, bigm = params
-    startidx = perfwindow[end] + 1
+function volavolumecorr(volumes, returns)
+    bigm = size(returns, 1)
     correlation = zeros(bigm)
     for asset in 1:bigm
         correlation[asset] =
-        StatsBase.cor(volumes[asset, (startidx+1):end],
-        broadcast(abs, returns[asset, startidx:end]))
+        StatsBase.cor(volumes[asset, :],
+        broadcast(abs, returns[asset, :]))
     end
     return correlation
 end
@@ -555,32 +545,78 @@ function lossgainratio(returns, cutoff, params)
     return ratios
 end
 
-# TODO: move plots to separate file
-# TODO: save plots in plots file
+function calc_pacf(demeanedreturns::Vector{Float64}, lags)
+    pacfcoeffs = pacf(demeanedreturns, lags)
+    confinterval = 1.96 / sqrt(length(demeanedreturns))
+    return pacfcoeffs, confinterval
+end
 
-function plot_stylisedfacts(marketval, stocksval, stocksvolume, params,
-        returnspctile=5)
-    @unpack perfwindow, plotpath = params
-    marketreturns = Func.assetreturns(marketval)
-    stockreturns = Func.assetreturns(stocksval)
+function calc_pacf(demeanedreturns::Matrix{Float64}, lags)
+    bigm = size(demeanedreturns, 1)
+    pacfcoeffs = similar(demeanedreturns, bigm, length(lags))
+    for assetidx in 1:bigm
+        pacfcoeffs[assetidx, :] .= pacf(demeanedreturns[assetidx, :], lags)
+    end
+    confinterval = 1.96 / sqrt(size(demeanedreturns, 1))
+    return pacfcoeffs, confinterval
+end
+
+function calc_stylisedfacts(marketval, stocksval, stocksvolume, params;
+        maxlag=10, returnspctile=5)
+    @unpack perfwindow = params
+    lags = collect(1:maxlag)
+    # Returns from prices
+    marketreturns = Func.assetreturns(marketval, perfwindow)
+    stockreturns = Func.assetreturns(stocksval, perfwindow)
     demeanedmarketreturns = Func.demean(marketreturns)
     demeanedstockreturns = Func.demean(stockreturns)
     demeanedmarketreturnssquared = demeanedmarketreturns.^2
     demeanedstockreturnssquared = demeanedstockreturns.^2
-    lags = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]#collect[1:10]
-    choice = rand(1:size(stockreturns,1))
-    #pyplot() # In case GR throws an error
+    # Autocorrelation of returns
+    stockpacf = calc_pacf(demeanedstockreturns, lags)
+    marketpacf = calc_pacf(demeanedmarketreturns, lags)
+    # Volatility clustering
+    stockvolacluster = calc_pacf(demeanedstockreturnssquared, lags)
+    marketvolacluster = calc_pacf(demeanedmarketreturnssquared, lags)
+    # Kurtosis
+    stockkurtoses = Func.calc_kurtoses(demeanedstockreturns)
+    # Loss-gain ratio
+    lossgainratios = Func.lossgainratio(demeanedstockreturns,
+        returnspctile, params)
+    # Volume-volatility correlation
+    corrs = Func.volavolumecorr(stocksvolume[:, perfwindow[end]+2:end],
+        demeanedstockreturns)
+    return demeanedstockreturns, demeanedmarketreturns, stockpacf, marketpacf,
+        stockvolacluster, marketvolacluster, stockkurtoses,lossgainratios, corrs
+end
+
+function plot_stylisedfacts(marketval, stocksval, stylefacts, params)
+    @unpack plotpath = params
+    demeanedstockreturns = stylefacts[1]
+    demeanedmarketreturns = stylefacts[2]
+    stockpacf = stylefacts[3]
+    marketpacf = stylefacts[4]
+    stockvolacluster = stylefacts[5]
+    marketvolacluster = stylefacts[6]
+    stockkurtoses = stylefacts[7]
+    lossgainratios = stylefacts[8]
+    corrs = stylefacts[9]
+    choice = rand(1:size(stocksval,1)) # Could print random choice on plots
+    # NOTE: confidence interval magic number
+    confinterval = 1.96 / sqrt(size(demeanedstockreturns, 2))
     plot_pricehistories(stocksval, marketval, plotpath)
     plot_marketreturnhistogram(demeanedmarketreturns, plotpath)
-    plot_stockreturnhistogram(demeanedstockreturns, choice, plotpath)
-    plot_marketpacf(demeanedmarketreturns, lags, plotpath)
-    plot_stockpacf(demeanedstockreturns, choice, lags, plotpath)
-    plot_marketvolaclustering(demeanedmarketreturnssquared, lags, plotpath)
-    plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags,plotpath)
-    plot_stockkurtoses(demeanedstockreturns, plotpath, params)
-    plot_lossgainratio(demeanedstockreturns, returnspctile, plotpath, params)
-    plot_volavolumecorr(stocksvolume, demeanedstockreturns, plotpath, params)
-    plot_logprobs(demeanedstockreturns, perfwindow, plotpath)
+    plot_stockreturnhistogram(demeanedstockreturns[choice, :], plotpath)
+    plot_marketpacf(demeanedmarketreturns, confinterval, plotpath)
+    plot_stockpacf(demeanedstockreturns[choice, :], confinterval, plotpath)
+    plot_marketvolaclustering(demeanedmarketreturns.^2, confinterval,
+        plotpath)
+    plot_stockvolaclustering(demeanedstockreturns[choice, :].^2,
+        confinterval, plotpath)
+    plot_stockkurtoses(stockkurtoses, plotpath)
+    plot_lossgainratio(lossgainratios, plotpath)
+    plot_volavolumecorr(corrs, plotpath)
+    plot_logprobs(demeanedstockreturns, plotpath)
 end
 
 # TODO: refactor plots - DRY
@@ -605,8 +641,8 @@ function plot_marketreturnhistogram(asset, plotpath)
     display(plt)
 end
 
-function plot_stockreturnhistogram(demeanedstockreturns, choice, plotpath)
-    asset = demeanedstockreturns[choice, :]
+function plot_stockreturnhistogram(demeanedstockreturns, plotpath)
+    asset = demeanedstockreturns
     StatsPlots.histogram(asset, bins=100, title="Example of stock returns",
         label="Random stock's returns", legend=:topright)
     x = findmin(asset)[1]:0.001:findmax(asset)[1]
@@ -616,72 +652,62 @@ function plot_stockreturnhistogram(demeanedstockreturns, choice, plotpath)
     display(plt)
 end
 
-function plot_marketpacf(demeanedmarketreturns, lags, plotpath)
-    asset = demeanedmarketreturns
-    pacfcoeffs = pacf(demeanedmarketreturns, lags)
+
+# TODO: X-axis should be Int 1:10, no duplication of legend, tell which stock#
+function plot_marketpacf(pacfcoeffs, confinterval, plotpath)
     StatsPlots.bar(pacfcoeffs, title="Market autocorrelation",
         label="Partial correlation coefficients")
     plt = StatsPlots.plot!(0:0.01:10,
-        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
-        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        [ones(length(0:0.01:10)) .* confinterval,
+        -ones(length(0:0.01:10)) .* confinterval,],
         lc=:red, label="critical values", legend=:bottomright)
     png(joinpath(plotpath, "marketautocorrelation"))
     display(plt)
 end
 
-function plot_stockpacf(demeanedstockreturns, choice, lags, plotpath)
-    asset = demeanedstockreturns[choice,: ]
-    pacfcoeffs = pacf(asset, lags)
+function plot_stockpacf(pacfcoeffs, confinterval, plotpath)
     StatsPlots.bar(pacfcoeffs,
         title="Stock autocorrelation (random stock example)",
         label="Partial autocorrelation coefficients, demeaned returns",
         legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10,
-        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
-        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        [ones(length(0:0.01:10)) .* confinterval,
+        -ones(length(0:0.01:10)) .* confinterval,],
         lc=:red, label="Critical values")
     png(joinpath(plotpath, "stockautocorrelation"))
     display(plt)
 end
 
-function plot_marketvolaclustering(demeanedmarketreturnssquared, lags, plotpath)
-    asset = demeanedmarketreturnssquared
-    pacfcoeffs = pacf(asset, lags)
+function plot_marketvolaclustering(pacfcoeffs, confinterval, plotpath)
     StatsPlots.bar(pacfcoeffs, title="Volatility clustering, market",
         label="Partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10,
-        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
-        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        [ones(length(0:0.01:10)) .* confinterval,
+        -ones(length(0:0.01:10)) .* confinterval,],
         lc=:red, label="Critical values")
     png(joinpath(plotpath, "marketvolaclustering"))
     display(plt)
 end
 
-function plot_stockvolaclustering(demeanedstockreturnssquared, choice, lags,
-        plotpath)
-    asset = demeanedstockreturnssquared[choice,:]
-    pacfcoeffs = pacf(asset, lags)
+function plot_stockvolaclustering(pacfcoeffs, confinterval, plotpath)
     StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock",
         label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10,
-        [ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),
-        -ones(length(0:0.01:10)) .* 1.96 / sqrt(size(asset, 1)),],
+        [ones(length(0:0.01:10)) .* confinterval,
+        -ones(length(0:0.01:10)) .* confinterval,],
         lc=:red, label="Critical values")
     png(joinpath(plotpath, "stockvolaclustering"))
     display(plt)
 end
 
-function plot_stockkurtoses(demeanedstockreturns, plotpath, params)
-    stockkurtoses = Func.calckurtoses(demeanedstockreturns, params)
+function plot_stockkurtoses(stockkurtoses, plotpath)
     plt = StatsPlots.bar(sort!(stockkurtoses, rev=true),
         title="Kurtoses of stock returns", label="Kurtoses")
     png(joinpath(plotpath, "kurtoses"))
     display(plt)
 end
 
-function plot_lossgainratio(demeanedstockreturns, returnspercentile, plotpath,
-        params)
-    ratios = Func.lossgainratio(demeanedstockreturns, returnspercentile, params)
+function plot_lossgainratio(ratios, plotpath)
     StatsPlots.plot(ratios, title="Gain-loss asymmetry in stock returns",
         label="# large losses / # large gains")
     plt = StatsPlots.plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios),
@@ -690,20 +716,18 @@ function plot_lossgainratio(demeanedstockreturns, returnspercentile, plotpath,
     display(plt)
 end
 
-function plot_volavolumecorr(volume, demeanedstockreturns, plotpath, params)
-    corrs = Func.volavolumecorr(volume, demeanedstockreturns, params)
-    plt = StatsPlots.bar(sort(corrs, rev=true),
+function plot_volavolumecorr(correlations, plotpath)
+    plt = StatsPlots.bar(sort(correlations, rev=true),
         title="Volume-volatility correlation of stocks",
         label="Volume - absolute return correlation coefficients")
     png(joinpath(plotpath, "volavolumecorr"))
     display(plt)
 end
 
-function plot_logprobs(returns, perfwindow, plotpath)
-    startidx = perfwindow[end]+1
-    stdevs = StatsBase.std(returns[:, startidx:end], dims=2)
+function plot_logprobs(returns, plotpath)
+    stdevs = StatsBase.std(returns, dims=2)
     returns = returns ./ stdevs
-    returns = collect(Base.Iterators.flatten(returns[:, startidx:end]))
+    returns = collect(Base.Iterators.flatten(returns))
     returnshist = PyPlot.hist(returns, 100)
     returnbins = returnshist[1]
     steps = returnshist[2][2:end]
