@@ -1,6 +1,6 @@
 module Func
 using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
-using Base.Iterators, Parameters
+using Base.Iterators, Parameters, HypothesisTests
 using PyPlot
 
 include("types.jl")
@@ -586,8 +586,32 @@ function calc_stylisedfacts(marketval, stocksval, stocksvolume, params;
     # Volume-volatility correlation
     corrs = Func.volavolumecorr(stocksvolume[:, perfwindow[end]+2:end],
         demeanedstockreturns)
+
+    # Z scores of mean being equal to hypotheses
+    zScoreKurtoses = HypothesisTests.OneSampleZTest(stockkurtoses, 0.0)
+    println(zScoreKurtoses)
+    zScoreLossGain = HypothesisTests.OneSampleZTest(lossgainratios, 1.0)
+    println(zScoreLossGain)
+    zScoreVolumeVola = HypothesisTests.OneSampleZTest(corrs, 0.0)
+    println(zScoreVolumeVola)
+    flatreturns = collect(Base.Iterators.flatten(demeanedstockreturns))
+    samplemean = StatsBase.mean(flatreturns)
+    samplestd  = StatsBase.std(flatreturns)
+    d = Distributions.Normal(samplemean, samplestd)
+    resultKStest = HypothesisTests.ExactOneSampleKSTest(flatreturns,d)
+    println(resultKStest)
+
+
     return demeanedstockreturns, demeanedmarketreturns, stockpacf, marketpacf,
-        stockvolacluster, marketvolacluster, stockkurtoses,lossgainratios, corrs
+        stockvolacluster, marketvolacluster, stockkurtoses,lossgainratios,
+        corrs, zScoreKurtoses, zScoreLossGain, zScoreVolumeVola, resultKStest
+end
+
+function calc_zScore(sample, muZero)
+    sampleMean = StatsBase.mean(sample)
+    sampleSTD = StatsBase.std(sample)
+    zScore = (sampleMean - muZero) / (sampleSTD / sqrt(length(sample)))
+    return zScore
 end
 
 function plot_stylisedfacts(marketval, stocksval, stylefacts, params)
@@ -604,19 +628,28 @@ function plot_stylisedfacts(marketval, stocksval, stylefacts, params)
     choice = rand(1:size(stocksval,1)) # Could print random choice on plots
     # NOTE: confidence interval magic number
     confinterval = 1.96 / sqrt(size(demeanedstockreturns, 2))
+    # TODO: Restrict the y-axis
+    ## Comment out single examples and those not required for results ##
+    # plot_stockpacf(demeanedstockreturns[choice, :], confinterval, plotpath)
+    # plot_stockvolaclustering(stockvolacluster[1][choice,:], confinterval, plotpath)
+    # plot_marketvolaclustering(demeanedmarketreturns.^2, confinterval, plotpath)
+    # plot_marketreturnhistogram(demeanedmarketreturns, plotpath)
+    # plot_stockreturnhistogram(demeanedstockreturns[choice, :], plotpath)
+    # plot_marketpacf(demeanedmarketreturns, confinterval, plotpath)
+
     plot_pricehistories(stocksval, marketval, plotpath)
-    plot_marketreturnhistogram(demeanedmarketreturns, plotpath)
-    plot_stockreturnhistogram(demeanedstockreturns[choice, :], plotpath)
-    plot_marketpacf(demeanedmarketreturns, confinterval, plotpath)
-    plot_stockpacf(demeanedstockreturns[choice, :], confinterval, plotpath)
-    plot_marketvolaclustering(demeanedmarketreturns.^2, confinterval,
-        plotpath)
-    plot_stockvolaclustering(demeanedstockreturns[choice, :].^2,
+
+    plot_stockpacf(StatsBase.mean(stockpacf[1],dims=1)', confinterval, plotpath)
+
+    plot_stockvolaclustering(StatsBase.mean(stockvolacluster[1],dims=1)',
         confinterval, plotpath)
+
     plot_stockkurtoses(stockkurtoses, plotpath)
     plot_lossgainratio(lossgainratios, plotpath)
     plot_volavolumecorr(corrs, plotpath)
     plot_logprobs(demeanedstockreturns, plotpath)
+
+    # println(result)
 end
 
 # TODO: refactor plots - DRY
@@ -626,7 +659,7 @@ function plot_pricehistories(stocksval, marketval, plotpath)
     StatsPlots.plot(periods, transpose(stocksval)[:, nstocks], legend=:none,
     title="Asset prices history (market in black)")
     plt = StatsPlots.plot!(
-        periods, marketval, lw=3, lc=:black, label="Market index")
+        periods, marketval, lw=3, lc=:black, label="Market index", ylims=(0,300))
     png(joinpath(plotpath, "returnshistory"))
     display(plt)
 end

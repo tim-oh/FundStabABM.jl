@@ -2,10 +2,10 @@ module Params
 using Parameters
 
 default = @with_kw (
-    bigm = 200, # Number of stocks
-    bign = 500, # Number of investors
-    bigt = 1100, # Number of days
-    bigk = 200, # Number of funds
+    bigm = 250, # Number of stocks
+    bign = 1000, # Number of investors
+    bigt = 1350, # Number of days
+    bigk = 250, # Number of funds
 
     # Market parameters
     marketstartval = 100,
@@ -13,7 +13,7 @@ default = @with_kw (
     marketvol = 0.01,
 
     # Stock parameters
-    impactrange = 0.0002:0.0002:0.002,
+    impactrange = 0.00075:0.0001:0.0075,
     betamean = 1,
     betastd = 0.3,
     stockstartval = 100,
