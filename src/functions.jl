@@ -1,6 +1,6 @@
 module Func
 using Random, Test, StatsBase, ProgressMeter, StatsPlots, Distributions
-using Base.Iterators, Parameters, HypothesisTests
+using Base.Iterators, Parameters, HypothesisTests, GLM, DataFrames
 using PyPlot
 
 include("types.jl")
@@ -700,8 +700,9 @@ end
 
 function plot_stockpacf(pacfcoeffs, confinterval, plotpath)
     StatsPlots.bar(pacfcoeffs,
-        title="Stock autocorrelation (random stock example)",
+        title="Averag stock return autocorrelation",
         label="Partial autocorrelation coefficients, demeaned returns",
+        xticks = 1:1:10,
         legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10,
         [ones(length(0:0.01:10)) .* confinterval,
@@ -723,8 +724,10 @@ function plot_marketvolaclustering(pacfcoeffs, confinterval, plotpath)
 end
 
 function plot_stockvolaclustering(pacfcoeffs, confinterval, plotpath)
-    StatsPlots.bar(pacfcoeffs, title="Volatility clustering, random stock",
-        label="partial autocorrelation coefficients, squared demeaned returns", legend=:bottomright)
+    StatsPlots.bar(pacfcoeffs, title="Average stock volatility clustering",
+        label="Partial autocorrelation coefficients, de-meaned squared returns",
+        xticks = 1:1:10,
+        legend=:bottomright)
     plt = StatsPlots.plot!(0:0.01:10,
         [ones(length(0:0.01:10)) .* confinterval,
         -ones(length(0:0.01:10)) .* confinterval,],
@@ -741,9 +744,10 @@ function plot_stockkurtoses(stockkurtoses, plotpath)
 end
 
 function plot_lossgainratio(ratios, plotpath)
-    StatsPlots.plot(ratios, title="Gain-loss asymmetry in stock returns",
-        label="# large losses / # large gains")
-    plt = StatsPlots.plot!(0:0.01:200, ones(length(0:0.01:200)) * mean(ratios),
+    nratios = length(ratios)
+    StatsPlots.plot(ratios, title="Loss-gain asymmetry in stock returns",
+        label="# Large losses / # Large gains")
+    plt = StatsPlots.plot!(0:0.01:nratios, ones(length(0:0.01:nratios)) * mean(ratios),
         label="Mean ratio")
     png(joinpath(plotpath, "lossgainratio"))
     display(plt)
@@ -770,8 +774,9 @@ function plot_logprobs(returns, plotpath)
     normalprobs = pdfnormal ./ sum(pdfnormal)
     pyplot()
     StatsPlots.plot(steps, log10.(returnprobs), label=:"Actual returns",
-        xlabel=:"Stocks' daily returns / st dev",
-        ylabel=:"log10 of return probability")
+        title="Comparison of whitened stock returns with normal distribution",
+        xlabel=:"De-meaned stocks' daily returns / stock standard devivation",
+        ylabel=:"Logarithm of return probability")
     plt = StatsPlots.plot!(steps, log10.(normalprobs),
         label=:"Fitted normal distn")
     png(joinpath(plotpath, "logprobs"))

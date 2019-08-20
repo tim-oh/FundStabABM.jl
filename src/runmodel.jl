@@ -41,7 +41,6 @@ function runmodel(params=Params.default(); fundselector="probabilistic",
 
     stylefacts = Func.calc_stylisedfacts(market.value, stocks.value,
         stocks.volume, params)
-    println(typeof(stylefacts))
 
     if doplot
         Func.plot_stylisedfacts(market.value, stocks.value, stylefacts, params)
