@@ -272,7 +272,7 @@ end
 
 # TODO: respawn test should have thrown error when I ran it without updating
 # inputs to fundholdinit!
-function respawn!(funds, investors, t, stockvals, params)
+function respawn!(funds, investors, t, stocks, params, liquidationlog)
     @unpack portfsizerange = params
     buyorders = Types.BuyMarketOrder(
     Array{Float64}(undef, 0, size(funds.holdings, 2)), Array{Float64}(undef, 0))
@@ -289,13 +289,41 @@ function respawn!(funds, investors, t, stockvals, params)
         investors.assets[inv, end] = 0
         # Re-use fund holdings init fctn to draw new stocks and generate order
         buyorder = (fundholdinit!(funds.holdings[egg, :]',
-        capital, stockvals[:, t], params)' .* stockvals[:, t])'
+            capital, stocks.value[:, t], params)' .* stocks.value[:, t])'
         buyorders.values = vcat(buyorders.values, buyorder)
         buyorders.funds = vcat(buyorders.funds, egg)
         # Set anchor investor's stake
         funds.stakes[egg, inv] = 1
+        # Update current log
+        chkidxnew = egg
+        chkidxold = []
+        chkval = 1
+        while chkval == 1
+            chkidxold = chkidxnew
+            chkval = liquidationlog.failed[chkidxold]
+            chkidxnew = liquidationlog.replacedby[chkidxold]
+        end
+        liquidationlog.failed[chkidxold] = 1
+        liquidationlog.replacedby[chkidxold] = size(liquidationlog, 1) + 1
+        liquidationlog.failtime[chkidxold] = t
+        # Add line for new fund. Note that size is approximate, pre-mkt impact!
+        fundsize = sum(buyorder)
+        weights = buyorder/ fundsize
+        weights = dropdims(weights, dims=1)
+        weightedliquidities = weights .* stocks.impact
+        fundliquidity = sum(weightedliquidities)
+        push!(liquidationlog, (0, 0, fundsize, fundliquidity, 0))
     end
-    return buyorders, investors.assets, funds.stakes
+    return buyorders, investors.assets, funds.stakes, liquidationlog
+end
+
+# NOTE: I'm only calculating this value at respawn, should be after reinvest
+function calc_liquidity(funds, stocks, fundID, timenow)
+    weights = funds.holdings[fundID, :] .* stocks.value[:, timenow]
+    weights = weights/ sum(weights)
+    weightedliquidities = weights .* stocks.impact
+    avgliquidity = sum(weightedliquidities)
+    return avgliquidity
 end
 
 # NOTE: Bit of an issue: as many reinvestments as dead funds are randomly drawn,
@@ -412,9 +440,14 @@ function boundstest(market, stocks, investors, funds)
     end
 end
 
-function modelrun(market, stocks, investors, funds, params,
-        fundselector="bestperformer")
-    @unpack perfwindow, bigt, bigk = params
+function modelrun(market, stocks, investors, funds, params, fundselector="bestperformer")
+    @unpack perfwindow, bigt, bigk, bigm = params
+    initialliquidity = []
+    for fundidx in 1: bigm
+        push!(initialliquidity, calc_liquidity(funds, stocks, fundidx, 1))
+    end
+    liquidationlog = DataFrame(failed=zeros(Int64, bigm),
+        replacedby=zeros(Int64, bigm), initialsize=copy(funds.value[:,1]), liquidity=initialliquidity, failtime=zeros(Int64, bigm))
     @showprogress for t in perfwindow[end]+2:bigt
         Func.marketmove!(market.value, t, params)
         Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
@@ -430,8 +463,8 @@ function modelrun(market, stocks, investors, funds, params,
             Func.disburse!(investors.assets, divestments, cashout)
             # TODO: Write test that check each step of modelrun()
             if any(sum(funds.stakes, dims=2) .== 0)
-                buyorders, _, _ = Func.respawn!(funds, investors, t,
-                    stocks.value, params)
+                buyorders, _, _, liquidationlog = Func.respawn!(funds,
+                investors, t, stocks, params, liquidationlog)
                 Func.trackvolume!(stocks.volume, sellorders, t)
                 _, sharesout = Func.executeorder!(stocks, t, buyorders)
                 Func.disburse!(funds, sharesout, stocks.value)
@@ -448,6 +481,7 @@ function modelrun(market, stocks, investors, funds, params,
             end # reinvestment loop
         end # Divestment loop
     end # Model run loop
+    return liquidationlog
 end # runmodel function
 
 # TODO: Write tests for both assetreturns functions and vecreturns
@@ -614,7 +648,8 @@ function calc_zScore(sample, muZero)
     return zScore
 end
 
-function plot_stylisedfacts(marketval, stocksval, stylefacts, params)
+function plot_stylisedfacts(marketval, stocksval, stylefacts, params,
+        liquidationlog)
     @unpack plotpath = params
     demeanedstockreturns = stylefacts[1]
     demeanedmarketreturns = stylefacts[2]
@@ -648,8 +683,8 @@ function plot_stylisedfacts(marketval, stocksval, stylefacts, params)
     plot_lossgainratio(lossgainratios, plotpath)
     plot_volavolumecorr(corrs, plotpath)
     plot_logprobs(demeanedstockreturns, plotpath)
+    plot_liquidationcounts(liquidationlog, params, plotpath)
 
-    # println(result)
 end
 
 # TODO: refactor plots - DRY
@@ -781,6 +816,30 @@ function plot_logprobs(returns, plotpath)
         label=:"Fitted normal distn")
     png(joinpath(plotpath, "logprobs"))
     display(plt)
+end
+
+function plot_liquidationcounts(liquidationlog, params, plotpath)
+    @unpack perfwindow, bigt = params
+    xaxis = perfwindow[end]:bigt
+    liquidationcounts = []
+    for countidx in xaxis
+       push!(liquidationcounts, sum(liquidationlog.failtime .== countidx))
+    end
+    plt = StatsPlots.plot(xaxis,liquidationcounts,
+        linecolor = :red,
+        legend=:none,
+        title = "Fund liquidations by time period",
+        xlabel = "Days",
+        ylabel = "Fund liquidations per day")
+    png(joinpath(plotpath, "liquidationcounts"))
+    display(plt)
+end
+
+function logisticregression(liquidationlog)
+    whitenedlog = copy(liquidationlog)
+    whitenedlog.initialsize = (whitenedlog.initialsize .- StatsBase.mean(whitenedlog.initialsize)) ./ StatsBase.std(whitenedlog.initialsize)
+    whitenedlog.liquidity = (whitenedlog.liquidity .- StatsBase.mean(whitenedlog.liquidity)) ./ StatsBase.std(whitenedlog.liquidity)
+    logit = glm(@formula(failed ~ initialsize + liquidity), whitenedlog, Binomial(), LogitLink())
 end
 
 end  # module Functions

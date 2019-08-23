@@ -35,7 +35,7 @@ end
 
 struct EquityFund <: AssetManager
     holdings::Matrix{Float64} # Units of each stock held in the fund's portfolio
-    stakes::Matrix{Float64} # Share of assets that each investor in the funds own
+    stakes::Matrix{Float64} # Share of assets each investor in the funds owns
     value::Matrix{Float64} # Fund's value history
 end
 

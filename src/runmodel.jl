@@ -1,5 +1,5 @@
 using Test, Random, LinearAlgebra, StatsBase, StatsPlots, Distributions
-using Traceur, Parameters, Logging, Dates
+using Traceur, Parameters, Logging, Dates, GLM
 
 using .Types, .Func, .Params
 
@@ -33,21 +33,33 @@ function runmodel(params=Params.default(); fundselector="probabilistic",
         Func.boundstest(market, stocks, investors, funds)
     end
 
-    Func.modelrun(market, stocks, investors, funds, params, fundselector)
+    liquidationlog = Func.modelrun(market, stocks, investors, funds, params,
+        fundselector)
+    println(liquidationlog)
 
     if boundstest
         Func.boundstest(market, stocks, investors, funds)
     end
 
+    logit = Func.logisticregression(liquidationlog)
+    println("\nLogistic regression results with whitened indep vars\n", logit)
+
     stylefacts = Func.calc_stylisedfacts(market.value, stocks.value,
         stocks.volume, params)
 
     if doplot
-        Func.plot_stylisedfacts(market.value, stocks.value, stylefacts, params)
+        Func.plot_stylisedfacts(market.value, stocks.value, stylefacts, params,
+            liquidationlog)
         io = open(joinpath(plotpath, "parameters.txt"), "w+")
         logger = SimpleLogger(io)
         with_logger(logger) do
-            @info "Parameters" Dates.today() Dates.Time(Dates.now()) fundselector params "zScoreKurtoses" stylefacts[10] "zScoreLossGain" stylefacts[11] "zScoreVolumeVola" stylefacts[12] "resultKStest" stylefacts[13]
+            @info "Parameters" Dates.today() Dates.Time(Dates.now()) fundselector params
+            @info "zScoreKurtoses" stylefacts[10]
+            @info "zScoreLossGain" stylefacts[11]
+            @info "zScoreVolumeVola" stylefacts[12]
+            @info "resultKStest" stylefacts[13]
+            @info "logit" logit
+            @info "liquidationslog" liquidationlog
         end
         close(io)
     end
