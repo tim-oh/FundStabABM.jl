@@ -41,7 +41,7 @@ function runmodel(params=Params.default(); fundselector="probabilistic",
         Func.boundstest(market, stocks, investors, funds)
     end
 
-    logit = Func.logisticregression(liquidationlog)
+    logit = Func.logisticregression(liquidationlog, params)
     println("\nLogistic regression results with whitened indep vars\n", logit)
 
     stylefacts = Func.calc_stylisedfacts(market.value, stocks.value,
@@ -58,7 +58,9 @@ function runmodel(params=Params.default(); fundselector="probabilistic",
             @info "zScoreLossGain" stylefacts[11]
             @info "zScoreVolumeVola" stylefacts[12]
             @info "resultKStest" stylefacts[13]
-            @info "logit" logit
+            @info "logit1" logit[1]
+            @info "logit2" logit[2]
+            @info "logit3" logit[3]
             @info "liquidationslog" liquidationlog
         end
         close(io)

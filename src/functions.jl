@@ -300,19 +300,22 @@ function respawn!(funds, investors, t, stocks, params, liquidationlog)
         chkval = 1
         while chkval == 1
             chkidxold = chkidxnew
-            chkval = liquidationlog.failed[chkidxold]
+            chkval = liquidationlog.liquidated[chkidxold]
             chkidxnew = liquidationlog.replacedby[chkidxold]
         end
-        liquidationlog.failed[chkidxold] = 1
+        liquidationlog.liquidated[chkidxold] = 1
         liquidationlog.replacedby[chkidxold] = size(liquidationlog, 1) + 1
         liquidationlog.failtime[chkidxold] = t
+
         # Add line for new fund. Note that size is approximate, pre-mkt impact!
         fundsize = sum(buyorder)
+        nstocks = dropdims(sum(buyorder .> 0, dims=2), dims=2)
+        nstocks = convert(Int64, nstocks[1])
         weights = buyorder/ fundsize
         weights = dropdims(weights, dims=1)
         weightedliquidities = weights .* stocks.impact
         fundliquidity = sum(weightedliquidities)
-        push!(liquidationlog, (0, 0, fundsize, fundliquidity, 0))
+        push!(liquidationlog, (0, 0, fundsize, fundliquidity, 0, 1, nstocks))
     end
     return buyorders, investors.assets, funds.stakes, liquidationlog
 end
@@ -446,8 +449,11 @@ function modelrun(market, stocks, investors, funds, params, fundselector="bestpe
     for fundidx in 1: bigm
         push!(initialliquidity, calc_liquidity(funds, stocks, fundidx, 1))
     end
-    liquidationlog = DataFrame(failed=zeros(Int64, bigm),
-        replacedby=zeros(Int64, bigm), initialsize=copy(funds.value[:,1]), liquidity=initialliquidity, failtime=zeros(Int64, bigm))
+    liquidationlog = DataFrame(liquidated=zeros(Int64, bigm),
+        replacedby=zeros(Int64, bigm), initialsize=copy(funds.value[:,1]),
+        liquidity=initialliquidity, failtime=zeros(Int64, bigm),
+        ninvestors=dropdims(sum(funds.stakes .> 0, dims=2), dims=2),
+        nstocks = dropdims(sum(funds.holdings .> 0, dims =2), dims=2))
     @showprogress for t in perfwindow[end]+2:bigt
         Func.marketmove!(market.value, t, params)
         Func.stockmove!(stocks.value, t, market.value, stocks.beta, stocks.vol)
@@ -835,11 +841,21 @@ function plot_liquidationcounts(liquidationlog, params, plotpath)
     display(plt)
 end
 
-function logisticregression(liquidationlog)
+function logisticregression(liquidationlog, params)
+    @unpack bigm = params
     whitenedlog = copy(liquidationlog)
+    whitenedlog = first(whitenedlog, bigm)
     whitenedlog.initialsize = (whitenedlog.initialsize .- StatsBase.mean(whitenedlog.initialsize)) ./ StatsBase.std(whitenedlog.initialsize)
     whitenedlog.liquidity = (whitenedlog.liquidity .- StatsBase.mean(whitenedlog.liquidity)) ./ StatsBase.std(whitenedlog.liquidity)
-    logit = glm(@formula(failed ~ initialsize + liquidity), whitenedlog, Binomial(), LogitLink())
+    whitenedlog.nstocks = (whitenedlog.nstocks .- StatsBase.mean(whitenedlog.nstocks)) ./ StatsBase.std(whitenedlog.nstocks)
+
+    logit1 = glm(@formula(liquidated ~ initialsize + liquidity), whitenedlog, Binomial(), LogitLink())
+
+    logit2 = glm(@formula(liquidated ~ initialsize + liquidity + nstocks), whitenedlog, Binomial(), LogitLink())
+
+    logit3 = glm(@formula(liquidated ~ initialsize + liquidity + nstocks + nstocks*liquidity), whitenedlog, Binomial(), LogitLink())
+
+    return logit1, logit2, logit3
 end
 
 end  # module Functions
